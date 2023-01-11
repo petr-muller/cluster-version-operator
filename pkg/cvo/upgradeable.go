@@ -29,18 +29,40 @@ import (
 const (
 	adminAckGateFmt             string = "^ack-[4-5][.]([0-9]{1,})-[^-]"
 	upgradeableAdminAckRequired        = configv1.ClusterStatusConditionType("UpgradeableAdminAckRequired")
-	checkThrottlePeriod                = time.Minute
 )
 
 var adminAckGateRegexp = regexp.MustCompile(adminAckGateFmt)
+
+// upgradeableCheckIntervals holds the time intervals that drive how often CVO checks for upgradeability
+type upgradeableCheckIntervals struct {
+	// min is the "base" minimum interval between upgradeability checks, applied under normal circumstances
+	min time.Duration
+
+	// minOnFailedPreconditions is the minimum interval between upgradeability checks when precondition checks are
+	// failing and were recently (see afterPreconditionsFailed) changed. This should be lower than min because we want CVO
+	// to check upgradeability more often.
+	minOnFailedPreconditions time.Duration
+
+	// afterFailingPreconditions is the period of time after preconditions failed when minOnFailedPreconditions is
+	// applied instead of min
+	afterPreconditionsFailed time.Duration
+}
+
+func defaultUpgradeableCheckIntervals() upgradeableCheckIntervals {
+	return upgradeableCheckIntervals{
+		min:                      time.Minute,
+		minOnFailedPreconditions: 15 * time.Second,
+		afterPreconditionsFailed: 2 * time.Minute,
+	}
+}
 
 // syncUpgradeable synchronizes the upgradeable status only if it has been more than
 // the checkThrottlePeriod since the last synchronization or the precondition
 // checks on the payload are failing for less than minimumUpdateCheckInterval, and it has
 // been more than the minimumUpgradeableCheckInterval since the last synchronization.
-func (optr *Operator) syncUpgradeable(config *configv1.ClusterVersion) error {
+func (optr *Operator) syncUpgradeable(cv *configv1.ClusterVersion) error {
 	u := optr.getUpgradeable()
-	if u != nil && u.RecentlyChanged(checkThrottlePeriod) && !shouldSyncUpgradeableDueToPreconditionChecks(optr, config, u) {
+	if u != nil && u.RecentlyChanged(optr.upgradeableCheckIntervals.throttlePeriod(cv)) {
 		klog.V(2).Infof("Upgradeable conditions were recently checked, will try later.")
 		return nil
 	}
@@ -467,7 +489,7 @@ func (optr *Operator) adminGatesEventHandler() cache.ResourceEventHandler {
 	}
 }
 
-// shouldSyncUpgradeableDueToPreconditionChecks checks if the upgradeable status should
+// upgradeableCheckThrottlePeriod checks if the upgradeable status should
 // be synchronized due to the precondition checks. It checks whether the precondition
 // checks on the payload are failing for less than minimumUpdateCheckInterval, and it has
 // been more than the minimumUpgradeableCheckInterval since the last synchronization.
@@ -477,11 +499,12 @@ func (optr *Operator) adminGatesEventHandler() cache.ResourceEventHandler {
 // shouldSyncUpgradeableDueToPreconditionChecks expects the parameters not to be nil.
 //
 // Function returns true if the synchronization should happen, returns false otherwise.
-func shouldSyncUpgradeableDueToPreconditionChecks(optr *Operator, config *configv1.ClusterVersion, u *upgradeable) bool {
-	cond := resourcemerge.FindOperatorStatusCondition(config.Status.Conditions, DesiredReleaseAccepted)
-	if cond != nil && cond.Reason == "PreconditionChecks" && cond.Status == configv1.ConditionFalse &&
-		hasPassedDurationSinceTime(u.At, optr.minimumUpgradeableCheckInterval) && !hasPassedDurationSinceTime(cond.LastTransitionTime.Time, optr.minimumUpdateCheckInterval) {
-		return true
+func (intervals *upgradeableCheckIntervals) throttlePeriod(config *configv1.ClusterVersion) time.Duration {
+	if cond := resourcemerge.FindOperatorStatusCondition(config.Status.Conditions, DesiredReleaseAccepted); cond != nil {
+		if cond.Reason == "PreconditionChecks" && cond.Status == configv1.ConditionFalse &&
+			!hasPassedDurationSinceTime(cond.LastTransitionTime.Time, intervals.afterPreconditionsFailed) {
+			return intervals.minOnFailedPreconditions
+		}
 	}
-	return false
+	return intervals.min
 }
