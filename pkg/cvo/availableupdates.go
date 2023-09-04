@@ -71,6 +71,19 @@ func (optr *Operator) syncAvailableUpdates(ctx context.Context, config *configv1
 	current, updates, conditionalUpdates, condition := calculateAvailableUpdatesStatus(ctx, string(config.Spec.ClusterID),
 		transport, userAgent, upstream, desiredArch, currentArch, channel, optr.release.Version, optr.conditionRegistry)
 
+	if optr.availableUpdates != nil {
+		optr.statusLock.Lock()
+		for i := range optr.availableUpdates.ConditionalUpdates {
+			for j := range conditionalUpdates {
+				if optr.availableUpdates.ConditionalUpdates[i].Release.Image == conditionalUpdates[j].Release.Image {
+					conditionalUpdates[j].Conditions = optr.availableUpdates.ConditionalUpdates[i].Conditions
+					break
+				}
+			}
+		}
+		optr.statusLock.Unlock()
+	}
+
 	if usedDefaultUpstream {
 		upstream = ""
 	}
