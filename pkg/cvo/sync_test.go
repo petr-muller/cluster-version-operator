@@ -471,17 +471,17 @@ func newAction(gvk schema.GroupVersionKind, namespace, name string) action {
 }
 
 type fakeSyncRecorder struct {
-	Returns               *SyncWorkerStatus
-	Updates               []configv1.Update
-	stillInitializingFunc func() bool
+	Returns         *SyncWorkerStatus
+	Updates         []configv1.Update
+	initializedFunc func() bool
 }
 
-func (r *fakeSyncRecorder) StillInitializingFunc() func() bool {
-	if r.stillInitializingFunc != nil {
-		return r.stillInitializingFunc
+func (r *fakeSyncRecorder) InitializedFunc() func() bool {
+	if r.initializedFunc != nil {
+		return r.initializedFunc
 	}
 	return func() bool {
-		return false
+		return true
 	}
 }
 
