@@ -476,13 +476,8 @@ type fakeSyncRecorder struct {
 	initializedFunc func() bool
 }
 
-func (r *fakeSyncRecorder) InitializedFunc() func() bool {
-	if r.initializedFunc != nil {
-		return r.initializedFunc
-	}
-	return func() bool {
-		return true
-	}
+func (r *fakeSyncRecorder) Initialized() bool {
+	return r.initializedFunc == nil || r.initializedFunc()
 }
 
 func (r *fakeSyncRecorder) StatusCh() <-chan SyncWorkerStatus {

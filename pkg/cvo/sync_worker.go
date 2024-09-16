@@ -35,8 +35,8 @@ type ConfigSyncWorker interface {
 
 	// NotifyAboutManagedResourceActivity informs the sync worker about activity for a managed resource.
 	NotifyAboutManagedResourceActivity(msg string)
-	// InitializedFunc a function that returns true if ConfigSyncWorker has work to do already
-	InitializedFunc() func() bool
+	// Initialized returns true if ConfigSyncWorker has work to do already
+	Initialized() bool
 }
 
 // PayloadInfo returns details about the payload when it was retrieved.
@@ -236,13 +236,12 @@ func (w *SyncWorker) StatusCh() <-chan SyncWorkerStatus {
 	return w.report
 }
 
-func (w *SyncWorker) InitializedFunc() func() bool {
+func (w *SyncWorker) Initialized() bool {
 	if w.initializedFunc != nil {
-		return w.initializedFunc
+		return w.initializedFunc()
 	}
-	return func() bool {
-		return w.work != nil
-	}
+
+	return w.work != nil
 }
 
 // NotifyAboutManagedResourceActivity informs the sync worker about activity for a managed resource.
