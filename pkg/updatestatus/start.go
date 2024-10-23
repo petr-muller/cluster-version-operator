@@ -36,6 +36,8 @@ func Run(ctx context.Context, cc *controllercmd.ControllerContext) error {
 	updateStatusController, sendInsight := newUpdateStatusController(ctx, coreClient, uscNamespaceCoreInformers, cc.EventRecorder)
 	controlPlaneInformerController := newControlPlaneInformerController(configInformers, cc.EventRecorder, sendInsight)
 
+	// start the informers, but we do not need to wait for them to sync because each controller waits
+	// for synced informers it uses in its Run() method
 	configInformers.Start(ctx.Done())
 	uscNamespaceCoreInformers.Start(ctx.Done())
 
