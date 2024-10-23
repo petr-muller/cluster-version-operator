@@ -3,16 +3,21 @@ package main
 import (
 	"context"
 
+	k8sversion "k8s.io/apimachinery/pkg/version"
+
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 
 	"github.com/openshift/cluster-version-operator/pkg/updatestatus"
-	"github.com/openshift/cluster-version-operator/pkg/version"
+	cvoversion "github.com/openshift/cluster-version-operator/pkg/version"
 )
 
 func init() {
 	uscCommand := controllercmd.NewControllerCommandConfig(
 		"update-status-controller",
-		version.Get(),
+		// TODO(USC: TechPreview): Unify version handling, potentially modernize CVO pkg/version
+		//                         to use k8sversion.Info too.
+		// https://github.com/openshift/cluster-version-operator/pull/1091#discussion_r1810601697
+		k8sversion.Info{GitVersion: cvoversion.Raw},
 		updatestatus.Run,
 	).NewCommandWithContext(context.Background())
 
