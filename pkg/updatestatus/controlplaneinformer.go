@@ -76,11 +76,14 @@ func (c *controlPlaneInformerController) sync(_ context.Context, syncCtx factory
 		return err
 	}
 
-	klog.V(2).Infof("CPI :: Syncing ClusterVersion %s", clusterVersion.Name)
-
 	now := c.now()
 	insight := assessClusterVersion(clusterVersion, now)
 	msg := makeInsightMsgForClusterVersion(insight, now)
+	var msgForLog string
+	if klog.V(4).Enabled() {
+		msgForLog = fmt.Sprintf(" | msg=%s", string(msg.insight))
+	}
+	klog.V(2).Infof("CPI :: Syncing ClusterVersion %s%s", clusterVersion.Name, msgForLog)
 	c.sendInsight(msg)
 
 	return nil
