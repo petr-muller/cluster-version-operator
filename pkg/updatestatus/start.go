@@ -44,6 +44,9 @@ func Run(ctx context.Context, cc *controllercmd.ControllerContext) error {
 
 	klog.Info("USC :: Controllers started")
 
+	// TODO(USC: TechPreview): Figure out if we need to wait for controllers to terminate
+	//                         gracefully (e.g. allowing USC to empty its insight queue?)
+	// https://github.com/openshift/cluster-version-operator/pull/1091#discussion_r1810615248
 	<-ctx.Done()
 	return nil
 }
