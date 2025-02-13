@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -38,32 +37,26 @@ type informerMsg struct {
 	// to be known, and is not required to be included in `knownInsights` by the informers (but informers can do so).
 	knownInsights []string
 
-	uid     string
-	insight []byte
+	uid string
+
+	cpInsight *updatestatus.ControlPlaneInsight
+	wpInsight *updatestatus.WorkerPoolInsight
 }
 
 func makeControlPlaneInsightMsg(insight updatestatus.ControlPlaneInsight, informer string) (informerMsg, error) {
-	rawInsight, err := yaml.Marshal(insight)
-	if err != nil {
-		return informerMsg{}, err
-	}
 	msg := informerMsg{
-		informer: informer,
-		uid:      insight.UID,
-		insight:  rawInsight,
+		informer:  informer,
+		uid:       insight.UID,
+		cpInsight: insight.DeepCopy(),
 	}
 	return msg, msg.validate()
 }
 
 func makeWorkerPoolsInsightMsg(insight updatestatus.WorkerPoolInsight, informer string) (informerMsg, error) {
-	rawInsight, err := yaml.Marshal(insight)
-	if err != nil {
-		return informerMsg{}, err
-	}
 	msg := informerMsg{
-		informer: informer,
-		uid:      insight.UID,
-		insight:  rawInsight,
+		informer:  informer,
+		uid:       insight.UID,
+		wpInsight: insight.DeepCopy(),
 	}
 	return msg, msg.validate()
 }
@@ -140,8 +133,10 @@ func (m informerMsg) validate() error {
 		return fmt.Errorf("empty informer")
 	case m.uid == "":
 		return fmt.Errorf("empty uid")
-	case len(m.insight) == 0:
-		return fmt.Errorf("empty or nil insight")
+	case m.cpInsight == nil && m.wpInsight == nil:
+		return fmt.Errorf("empty insight")
+	case m.cpInsight != nil && m.wpInsight != nil:
+		return fmt.Errorf("both control plane and worker pool insights set")
 	}
 
 	return nil
@@ -210,7 +205,12 @@ func (c *updateStatusController) updateInsightInStatusApi(msg informerMsg) {
 		oldContent = c.statusApi.cm.Data[cmKey]
 	}
 
-	updatedContent := string(msg.insight)
+	var updatedContent string
+	if msg.cpInsight != nil {
+		updatedContent = fmt.Sprintf("%s from %s", msg.cpInsight.UID, msg.informer)
+	} else {
+		updatedContent = fmt.Sprintf("%s from %s", msg.wpInsight.UID, msg.informer)
+	}
 
 	c.statusApi.cm.Data[cmKey] = updatedContent
 
