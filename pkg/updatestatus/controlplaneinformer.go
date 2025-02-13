@@ -22,7 +22,8 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 
 	"github.com/openshift/cluster-version-operator/lib/resourcemerge"
-	updatestatus "github.com/openshift/cluster-version-operator/pkg/updatestatus/api"
+
+	updatestatus "github.com/openshift/api/update/v1alpha1"
 )
 
 // controlPlaneInformerController is the controller that monitors health of the control plane-related resources
