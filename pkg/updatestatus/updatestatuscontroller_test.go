@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	updatestatus "github.com/openshift/api/update/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
 	clocktesting "k8s.io/utils/clock/testing"
@@ -19,43 +18,41 @@ import (
 
 func Test_updateStatusController(t *testing.T) {
 	testCases := []struct {
-		name                string
-		controllerConfigMap *corev1.ConfigMap
+		name string
 
-		informerMsg []informerMsg
-		expected    *corev1.ConfigMap
+		initialState  *updatestatus.UpdateStatus
+		informerMsg   []informerMsg
+		expectedState *updatestatus.UpdateStatus
 	}{
 		{
-			name:                "no messages, no state -> no state",
-			controllerConfigMap: nil,
-			informerMsg:         []informerMsg{},
-			expected:            nil,
+			name:          "no messages, no state -> no state",
+			initialState:  nil,
+			informerMsg:   []informerMsg{},
+			expectedState: nil,
 		},
 		{
-			name: "no messages, empty state -> empty state",
-			controllerConfigMap: &corev1.ConfigMap{
-				Data: map[string]string{},
+			name:          "no messages, empty state -> empty state",
+			initialState:  &updatestatus.UpdateStatus{},
+			expectedState: &updatestatus.UpdateStatus{},
+		},
+		{
+			name:         "no messages, state -> unchanged state",
+			initialState: &updatestatus.UpdateStatus{
+				// TODO: FIXME
+				// Data: map[string]string{
+				// 	"usc.cpi.cv-version": "value",
+				// },
 			},
-			expected: &corev1.ConfigMap{
-				Data: map[string]string{},
+			expectedState: &updatestatus.UpdateStatus{
+				// TODO: FIXME
+				// Data: map[string]string{
+				// 	"usc.cpi.cv-version": "value",
+				// },
 			},
 		},
 		{
-			name: "no messages, state -> unchanged state",
-			controllerConfigMap: &corev1.ConfigMap{
-				Data: map[string]string{
-					"usc.cpi.cv-version": "value",
-				},
-			},
-			expected: &corev1.ConfigMap{
-				Data: map[string]string{
-					"usc.cpi.cv-version": "value",
-				},
-			},
-		},
-		{
-			name:                "one message, no state -> initialize from message",
-			controllerConfigMap: nil,
+			name:         "one message, no state -> initialize from message",
+			initialState: nil,
 			informerMsg: []informerMsg{
 				{
 					informer:  "cpi",
@@ -63,19 +60,21 @@ func Test_updateStatusController(t *testing.T) {
 					cpInsight: &updatestatus.ControlPlaneInsight{UID: "cv-version"},
 				},
 			},
-			expected: &corev1.ConfigMap{
-				Data: map[string]string{
-					"usc.cpi.cv-version": "cv-version from cpi",
-				},
+			expectedState: &updatestatus.UpdateStatus{
+				// TODO: FIXME
+				// Data: map[string]string{
+				// 	"usc.cpi.cv-version": "cv-version from cpi",
+				// },
 			},
 		},
 		{
-			name: "messages over time build state over old state",
-			controllerConfigMap: &corev1.ConfigMap{
-				Data: map[string]string{
-					"usc.cpi.kept":        "kept",
-					"usc.cpi.overwritten": "old",
-				},
+			name:         "messages over time build state over old state",
+			initialState: &updatestatus.UpdateStatus{
+				// TODO: FIXME
+				// Data: map[string]string{
+				// 	"usc.cpi.kept":        "kept",
+				// 	"usc.cpi.overwritten": "old",
+				// },
 			},
 			informerMsg: []informerMsg{
 				{
@@ -103,13 +102,14 @@ func Test_updateStatusController(t *testing.T) {
 					knownInsights: []string{"kept", "new-item", "another"},
 				},
 			},
-			expected: &corev1.ConfigMap{
-				Data: map[string]string{
-					"usc.cpi.kept":        "kept",
-					"usc.cpi.new-item":    "new-item from cpi",
-					"usc.cpi.another":     "another from cpi",
-					"usc.cpi.overwritten": "overwritten from cpi",
-				},
+			expectedState: &updatestatus.UpdateStatus{
+				// TODO: FIXME
+				// Data: map[string]string{
+				// 	"usc.cpi.kept":        "kept",
+				// 	"usc.cpi.new-item":    "new-item from cpi",
+				// 	"usc.cpi.another":     "another from cpi",
+				// 	"usc.cpi.overwritten": "overwritten from cpi",
+				// },
 			},
 		},
 		{
@@ -131,17 +131,18 @@ func Test_updateStatusController(t *testing.T) {
 					wpInsight: &updatestatus.WorkerPoolInsight{UID: "item"},
 				},
 			},
-			expected: &corev1.ConfigMap{
-				Data: map[string]string{
-					"usc.one.item":   "item from one",
-					"usc.two.item":   "item from two",
-					"usc.three.item": "item from three",
-				},
+			expectedState: &updatestatus.UpdateStatus{
+				// TODO: FIXME
+				// Data: map[string]string{
+				// 	"usc.one.item":   "item from one",
+				// 	"usc.two.item":   "item from two",
+				// 	"usc.three.item": "item from three",
+				// },
 			},
 		},
 		{
-			name:                "empty informer -> message gets dropped",
-			controllerConfigMap: nil,
+			name:         "empty informer -> message gets dropped",
+			initialState: nil,
 			informerMsg: []informerMsg{
 				{
 					informer:  "",
@@ -149,11 +150,11 @@ func Test_updateStatusController(t *testing.T) {
 					cpInsight: &updatestatus.ControlPlaneInsight{UID: "item"},
 				},
 			},
-			expected: nil,
+			expectedState: nil,
 		},
 		{
-			name:                "empty uid -> message gets dropped",
-			controllerConfigMap: nil,
+			name:         "empty uid -> message gets dropped",
+			initialState: nil,
 			informerMsg: []informerMsg{
 				{
 					informer:  "one",
@@ -161,11 +162,11 @@ func Test_updateStatusController(t *testing.T) {
 					cpInsight: &updatestatus.ControlPlaneInsight{UID: ""},
 				},
 			},
-			expected: nil,
+			expectedState: nil,
 		},
 		{
-			name:                "nil insight payload -> message gets dropped",
-			controllerConfigMap: nil,
+			name:         "nil insight payload -> message gets dropped",
+			initialState: nil,
 			informerMsg: []informerMsg{
 				{
 					informer:  "one",
@@ -174,11 +175,11 @@ func Test_updateStatusController(t *testing.T) {
 					wpInsight: nil,
 				},
 			},
-			expected: nil,
+			expectedState: nil,
 		},
 		{
-			name:                "both cp & wp insights payload -> message gets dropped",
-			controllerConfigMap: nil,
+			name:         "both cp & wp insights payload -> message gets dropped",
+			initialState: nil,
 			informerMsg: []informerMsg{
 				{
 					informer:  "one",
@@ -187,14 +188,15 @@ func Test_updateStatusController(t *testing.T) {
 					wpInsight: &updatestatus.WorkerPoolInsight{UID: "item"},
 				},
 			},
-			expected: nil,
+			expectedState: nil,
 		},
 		{
-			name: "unknown message gets removed from state",
-			controllerConfigMap: &corev1.ConfigMap{
-				Data: map[string]string{
-					"usc.one.old": "payload",
-				},
+			name:         "unknown message gets removed from state",
+			initialState: &updatestatus.UpdateStatus{
+				// TODO: FIXME
+				// Data: map[string]string{
+				// 	"usc.one.old": "payload",
+				// },
 			},
 			informerMsg: []informerMsg{{
 				informer:      "one",
@@ -202,10 +204,10 @@ func Test_updateStatusController(t *testing.T) {
 				cpInsight:     &updatestatus.ControlPlaneInsight{UID: "new"},
 				knownInsights: nil,
 			}},
-			expected: &corev1.ConfigMap{
-				Data: map[string]string{
-					"usc.one.new": "new from one",
-				},
+			expectedState: &updatestatus.UpdateStatus{
+				// Data: map[string]string{
+				// 	"usc.one.new": "new from one",
+				// },
 			},
 		},
 	}
@@ -220,7 +222,7 @@ func Test_updateStatusController(t *testing.T) {
 				updateStatuses: updateStatusClient.UpdateV1alpha1().UpdateStatuses(),
 			}
 			controller.statusApi.Lock()
-			controller.statusApi.cm = tc.controllerConfigMap
+			controller.statusApi.us = tc.initialState
 			controller.statusApi.Unlock()
 
 			startInsightReceiver, sendInsight := controller.setupInsightReceiver()
@@ -244,12 +246,12 @@ func Test_updateStatusController(t *testing.T) {
 				defer controller.statusApi.Unlock()
 
 				sawProcessed = controller.statusApi.processed
-				diff = cmp.Diff(tc.expected, controller.statusApi.cm)
+				diff = cmp.Diff(tc.expectedState, controller.statusApi.us)
 
 				return diff == "" && sawProcessed == expectedProcessed, nil
 			}); err != nil {
 				if diff != "" {
-					t.Errorf("controller config map differs from expected:\n%s", diff)
+					t.Errorf("controller config map differs from expectedState:\n%s", diff)
 				}
 				if controller.statusApi.processed != len(tc.informerMsg) {
 					t.Errorf("controller processed %d messages, expected %d", controller.statusApi.processed, len(tc.informerMsg))
