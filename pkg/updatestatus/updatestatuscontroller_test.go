@@ -9,10 +9,10 @@ import (
 	updatestatus "github.com/openshift/api/update/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/util/workqueue"
 	clocktesting "k8s.io/utils/clock/testing"
 
+	fakeupdateclient "github.com/openshift/client-go/update/clientset/versioned/fake"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 )
@@ -214,10 +214,10 @@ func Test_updateStatusController(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			kubeClient := fake.NewClientset()
+			updateStatusClient := fakeupdateclient.NewClientset()
 
 			controller := updateStatusController{
-				configMaps: kubeClient.CoreV1().ConfigMaps(uscNamespace),
+				updateStatuses: updateStatusClient.UpdateV1alpha1().UpdateStatuses(),
 			}
 			controller.statusApi.Lock()
 			controller.statusApi.cm = tc.controllerConfigMap

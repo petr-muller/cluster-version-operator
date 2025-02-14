@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -16,14 +17,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	kubeinformers "k8s.io/client-go/informers"
-	kubeclient "k8s.io/client-go/kubernetes"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 
 	updatestatus "github.com/openshift/api/update/v1alpha1"
+	updateclient "github.com/openshift/client-go/update/clientset/versioned/typed/update/v1alpha1"
+	updateinformers "github.com/openshift/client-go/update/informers/externalversions"
 )
 
 // informerMsg is the communication structure between informers and the update status controller. It contains the UID of
@@ -85,7 +84,7 @@ func isStatusInsightKey(k string) bool {
 // NOTE: The communication mechanism was added in the initial scaffolding PR and does not aspire to be the final
 // and 100% efficient solution. Feel free to improve or even replace it if turns out to be unsuitable in practice.
 type updateStatusController struct {
-	configMaps corev1client.ConfigMapInterface
+	updateStatuses updateclient.UpdateStatusInterface
 
 	// statusApi is the desired state of the status API ConfigMap. It is updated when new insights are received.
 	// Any access to the struct should be done with the lock held.
@@ -103,24 +102,24 @@ type updateStatusController struct {
 // newUpdateStatusController creates a new update status controller and returns it. The second return value is a function
 // the other controllers should use to send insights to this controller.
 func newUpdateStatusController(
-	coreClient kubeclient.Interface,
-	coreInformers kubeinformers.SharedInformerFactory,
+	updateClient updateclient.UpdateV1alpha1Interface,
+	updateInformers updateinformers.SharedInformerFactory,
 	recorder events.Recorder,
 ) (factory.Controller, sendInsightFn) {
 	uscRecorder := recorder.WithComponentSuffix("update-status-controller")
 
 	c := &updateStatusController{
-		configMaps: coreClient.CoreV1().ConfigMaps(uscNamespace),
-		recorder:   uscRecorder,
+		updateStatuses: updateClient.UpdateStatuses(),
+		recorder:       uscRecorder,
 	}
 
 	startInsightReceiver, sendInsight := c.setupInsightReceiver()
 
-	cmInformer := coreInformers.Core().V1().ConfigMaps().Informer()
+	usInformer := updateInformers.Update().V1alpha1().UpdateStatuses().Informer()
 	controller := factory.New().
-		// call sync every 5 minutes or on CM events in the openshift-cluster-version namespace
+		// call sync every 5 minutes or on events on the status API
 		WithSync(c.sync).ResyncEvery(5*time.Minute).
-		WithFilteredEventsInformersQueueKeysFunc(cmNameKey, nsFilter(uscNamespace), cmInformer).
+		WithInformersQueueKeysFunc(queueKey, usInformer).
 		WithPostStartHooks(startInsightReceiver).
 		ToController("UpdateStatusController", c.recorder)
 
@@ -173,7 +172,7 @@ func (c *updateStatusController) setupInsightReceiver() (factory.PostStartHook, 
 			select {
 			case message := <-fromInformers:
 				if c.processInsightMsg(message) {
-					syncCtx.Queue().Add(statusApiConfigMap)
+					syncCtx.Queue().Add(updateStatusResource)
 				}
 			case <-ctx.Done():
 				klog.Info("USC :: Collector :: Stopping insight collector")
@@ -240,14 +239,14 @@ func (c *updateStatusController) removeUnknownInsights(message informerMsg) {
 }
 
 func (c *updateStatusController) commitStatusApiAsConfigMap(ctx context.Context) error {
-	// Check whether the CM exists and do nothing if it does not exist; we never create it, only update
-	clusterCm, err := c.configMaps.Get(ctx, statusApiConfigMap, metav1.GetOptions{})
+	// Check whether the UpdateStatus exists and do nothing if it does not exist; we never create it, only update
+	clusterUpdateStatus, err := c.updateStatuses.Get(ctx, updateStatusResource, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			klog.V(2).Info("USC :: Status API CM does not exist -> nothing to update")
+			klog.V(2).Info("USC :: Status API does not exist -> nothing to update")
 			return nil
 		}
-		klog.Errorf("USC :: Failed to get status API CM: %v", err)
+		klog.Errorf("USC :: Failed to get status API: %v", err)
 		return err
 	}
 
@@ -255,32 +254,32 @@ func (c *updateStatusController) commitStatusApiAsConfigMap(ctx context.Context)
 	defer c.statusApi.Unlock()
 
 	if c.statusApi.cm == nil {
-		// This means we are running on a CM event before first insight arrived, otherwise internal state would exist
+		// This means we are running on UpdateStatus event before first insight arrived, otherwise internal state would exist
 		klog.V(2).Infof("USC :: No internal state known yet, setting internal state to cluster state")
-		c.statusApi.cm = clusterCm.DeepCopy()
+		c.statusApi.cm = clusterUpdateStatus.DeepCopy()
 		return nil
 	}
 
 	// We have internal state, so we need to overwrite the cluster state with our internal state but keep items that we do
 	// not care about
-	mergedCm := clusterCm.DeepCopy()
-	for k := range mergedCm.Data {
+	mergedUpdateStatus := clusterUpdateStatus.DeepCopy()
+	for k := range mergedUpdateStatus.Data {
 		if isStatusInsightKey(k) {
-			delete(mergedCm.Data, k)
+			delete(mergedUpdateStatus.Data, k)
 		}
 	}
 
 	for k, v := range c.statusApi.cm.Data {
-		if mergedCm.Data == nil {
-			mergedCm.Data = map[string]string{}
+		if mergedUpdateStatus.Data == nil {
+			mergedUpdateStatus.Data = map[string]string{}
 		}
-		mergedCm.Data[k] = v
+		mergedUpdateStatus.Data[k] = v
 	}
 
-	klog.V(2).Infof("USC :: Updating status API CM (%d insights)", len(c.statusApi.cm.Data))
-	c.statusApi.cm = mergedCm
+	klog.V(2).Infof("USC :: Updating status API (%d insights)", len(c.statusApi.cm.Data))
+	c.statusApi.cm = mergedUpdateStatus
 
-	_, err = c.configMaps.Update(ctx, c.statusApi.cm, metav1.UpdateOptions{})
+	_, err = c.updateStatuses.Update(ctx, mergedUpdateStatus, metav1.UpdateOptions{})
 	return err
 }
 
@@ -288,42 +287,30 @@ func (c *updateStatusController) sync(ctx context.Context, syncCtx factory.SyncC
 	queueKey := syncCtx.QueueKey()
 	if queueKey == "" {
 		klog.V(2).Info("USC :: Periodic resync")
-		queueKey = statusApiConfigMap
+		queueKey = updateStatusResource
 	}
-	if queueKey != statusApiConfigMap {
-		// We only care about the status API CM
+
+	if queueKey != updateStatusResource {
+		// We only care about the single status API resource
 		return nil
 	}
 
-	klog.V(2).Infof("USC :: Syncing status API CM (name=%s)", queueKey)
+	klog.V(2).Infof("USC :: Syncing status API (name=%s)", queueKey)
 	return c.commitStatusApiAsConfigMap(ctx)
 }
 
-const statusApiConfigMap = "status-api-cm-prototype"
+const updateStatusResource = "status-api-prototype"
 
-func cmNameKey(object runtime.Object) []string {
+func queueKey(object runtime.Object) []string {
 	if object == nil {
 		return nil
 	}
 
 	switch o := object.(type) {
-	case *corev1.ConfigMap:
+	case *updatestatus.UpdateStatus:
 		return []string{o.Name}
 	}
 
 	klog.Fatalf("USC :: Unknown object type: %T", object)
 	return nil
-}
-
-func nsFilter(namespace string) factory.EventFilterFunc {
-	return func(obj interface{}) bool {
-		if obj == nil {
-			return false
-		}
-		switch o := obj.(type) {
-		case *corev1.ConfigMap:
-			return o.Namespace == namespace
-		}
-		return false
-	}
 }
