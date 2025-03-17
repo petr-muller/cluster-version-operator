@@ -152,8 +152,8 @@ github.com/operator-framework/api v0.17.1/go.mod h1:kk8xJahHJR3bKqrA+A+1VIrhOTmy
 github.com/operator-framework/operator-lifecycle-manager v0.22.0 h1:7DEWOq24HQ0l5xPOXMhn17XaJACgwoipz+JfQ7QCXZw=
 github.com/operator-framework/operator-lifecycle-manager v0.22.0/go.mod h1:4zssIIl23ohxS1nXRU9xTkBmwt+qleuHMO02BaWOHLA=
 github.com/orisano/pixelmatch v0.0.0-20220722002657-fb0b55479cde/go.mod h1:nZgzbfBr3hhjoZnS66nKrHmduYNpc34ny7RK4z5/HM0=
-github.com/petr-muller/api v0.0.0-20250311172725-8495ca67b053 h1:2XjM6XmMKmUTHFxJ+RISjDfo0Kwv25fkdSQ4Sdnuq8w=
-github.com/petr-muller/api v0.0.0-20250311172725-8495ca67b053/go.mod h1:yk60tHAmHhtVpJQo3TwVYq2zpuP70iJIFDCmeKMIzPw=
+github.com/petr-muller/api v0.0.0-20250327170451-bb998d952ce9 h1:APtw651GNymjs4/pgvRViJSOmGpgDLYCkkXUHswrjbk=
+github.com/petr-muller/api v0.0.0-20250327170451-bb998d952ce9/go.mod h1:yk60tHAmHhtVpJQo3TwVYq2zpuP70iJIFDCmeKMIzPw=
 github.com/petr-muller/openshift-client-go v0.0.0-20250317150702-f9791866507f h1:u1ShXKt9cBrim7FCX0ccc7iTJ/jhKY2XZMjC4rtvEo0=
 github.com/petr-muller/openshift-client-go v0.0.0-20250317150702-f9791866507f/go.mod h1:gTiGkvFUhdNExR0k5DnQNBb8eESSwPvQ+Ibgu78S72A=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=

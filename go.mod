@@ -118,6 +118,6 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace github.com/openshift/api => github.com/petr-muller/api v0.0.0-20250311172725-8495ca67b053
+replace github.com/openshift/api => github.com/petr-muller/api v0.0.0-20250327170451-bb998d952ce9
 
 replace github.com/openshift/client-go => github.com/petr-muller/openshift-client-go v0.0.0-20250317150702-f9791866507f

@@ -2,9 +2,51 @@ package v1alpha1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // HealthInsight is a piece of actionable information produced by an insight producer about the health
-// of the cluster or an update
+// of the cluster in the context of an update
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:path=healthinsights,scope=Cluster
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/2012
+// +openshift:file-pattern=cvoRunLevel=0000_00,operatorName=cluster-version-operator,operatorOrdering=02
+// +openshift:enable:FeatureGate=UpgradeStatus
+// +kubebuilder:metadata:annotations="description=Reports a piece of actionable information about the health of the cluster in the context of an update"
+// +kubebuilder:metadata:annotations="displayName=HealthInsights"
+// HealthInsight is a piece of actionable information produced by an insight producer about the health
+// of the cluster in the context of an update
 type HealthInsight struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// metadata is standard Kubernetes object metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// spec is empty for now, HealthInsight is purely status-reporting API. In the future spec may be used to hold
+	// configuration to drive what information is surfaced and how
+	// +required
+	Spec HealthInsightSpec `json:"spec"`
+	// status reports a piece of actionable information produced by an insight producer about the health
+	// of the cluster in the context of an update
+	// +optional
+	Status HealthInsightStatus `json:"status"`
+}
+
+// HealthInsightSpec is empty for now, HealthInsightSpec is purely status-reporting API. In the future spec may be used
+// to hold configuration to drive what information is surfaced and how
+type HealthInsightSpec struct {
+}
+
+// HealthInsightStatus reports a piece of actionable information produced by an insight producer about the health
+// of the cluster in the context of an update
+type HealthInsightStatus struct {
 	// startedAt is the time when the condition reported by the insight started
 	// +required
 	// +kubebuilder:validation:Type=string
@@ -33,20 +75,9 @@ type InsightScope struct {
 	// resources is a list of resources involved in the insight, of any group/kind. Maximum 16 resources can be listed.
 	// +optional
 	// +listType=atomic
-	// +kubebuilder:validation:MaxItems=16
+	// +kubebuilder:validation:MaxItems=128
 	Resources []ResourceRef `json:"resources,omitempty"`
 }
-
-// ScopeType is one of ControlPlane or WorkerPool
-// +kubebuilder:validation:Enum=ControlPlane;WorkerPool
-type ScopeType string
-
-const (
-	// ControlPlane is used for insights that are related to the control plane (including control plane pool or nodes)
-	ControlPlaneScope ScopeType = "ControlPlane"
-	// WorkerPool is used for insights that are related to a worker pools and nodes (excluding control plane)
-	WorkerPoolScope ScopeType = "WorkerPool"
-)
 
 // InsightImpact describes the impact the reported condition has on the cluster or update
 type InsightImpact struct {
@@ -128,4 +159,22 @@ type InsightRemediation struct {
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Format=date-time
 	EstimatedFinish *metav1.Time `json:"estimatedFinish,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// HealthInsightList is a list of HealthInsightList resources
+//
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
+type HealthInsightList struct {
+	metav1.TypeMeta `json:",inline"`
+	// metadata is standard Kubernetes object metadata
+	// +optional
+	metav1.ListMeta `json:"metadata"`
+
+	// items is a list of HealthInsight resources
+	// +optional
+	// +kubebuilder:validation:MaxItems=1024
+	Items []HealthInsight `json:"items"`
 }
