@@ -8,29 +8,28 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// NodeStatusInsightApplyConfiguration represents a declarative configuration of the NodeStatusInsight type for use
+// NodeProgressInsightStatusApplyConfiguration represents a declarative configuration of the NodeProgressInsightStatus type for use
 // with apply.
-type NodeStatusInsightApplyConfiguration struct {
-	Conditions          []v1.ConditionApplyConfiguration   `json:"conditions,omitempty"`
-	Name                *string                            `json:"name,omitempty"`
-	Resource            *ResourceRefApplyConfiguration     `json:"resource,omitempty"`
-	PoolResource        *PoolResourceRefApplyConfiguration `json:"poolResource,omitempty"`
-	Scope               *updatev1alpha1.ScopeType          `json:"scopeType,omitempty"`
-	Version             *string                            `json:"version,omitempty"`
-	EstimatedToComplete *metav1.Duration                   `json:"estimatedToComplete,omitempty"`
-	Message             *string                            `json:"message,omitempty"`
+type NodeProgressInsightStatusApplyConfiguration struct {
+	Conditions          []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	Name                *string                          `json:"name,omitempty"`
+	PoolResource        *ResourceRefApplyConfiguration   `json:"poolResource,omitempty"`
+	Scope               *updatev1alpha1.ScopeType        `json:"scopeType,omitempty"`
+	Version             *string                          `json:"version,omitempty"`
+	EstimatedToComplete *metav1.Duration                 `json:"estimatedToComplete,omitempty"`
+	Message             *string                          `json:"message,omitempty"`
 }
 
-// NodeStatusInsightApplyConfiguration constructs a declarative configuration of the NodeStatusInsight type for use with
+// NodeProgressInsightStatusApplyConfiguration constructs a declarative configuration of the NodeProgressInsightStatus type for use with
 // apply.
-func NodeStatusInsight() *NodeStatusInsightApplyConfiguration {
-	return &NodeStatusInsightApplyConfiguration{}
+func NodeProgressInsightStatus() *NodeProgressInsightStatusApplyConfiguration {
+	return &NodeProgressInsightStatusApplyConfiguration{}
 }
 
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Conditions field.
-func (b *NodeStatusInsightApplyConfiguration) WithConditions(values ...*v1.ConditionApplyConfiguration) *NodeStatusInsightApplyConfiguration {
+func (b *NodeProgressInsightStatusApplyConfiguration) WithConditions(values ...*v1.ConditionApplyConfiguration) *NodeProgressInsightStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithConditions")
@@ -43,23 +42,15 @@ func (b *NodeStatusInsightApplyConfiguration) WithConditions(values ...*v1.Condi
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *NodeStatusInsightApplyConfiguration) WithName(value string) *NodeStatusInsightApplyConfiguration {
+func (b *NodeProgressInsightStatusApplyConfiguration) WithName(value string) *NodeProgressInsightStatusApplyConfiguration {
 	b.Name = &value
-	return b
-}
-
-// WithResource sets the Resource field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Resource field is set to the value of the last call.
-func (b *NodeStatusInsightApplyConfiguration) WithResource(value *ResourceRefApplyConfiguration) *NodeStatusInsightApplyConfiguration {
-	b.Resource = value
 	return b
 }
 
 // WithPoolResource sets the PoolResource field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PoolResource field is set to the value of the last call.
-func (b *NodeStatusInsightApplyConfiguration) WithPoolResource(value *PoolResourceRefApplyConfiguration) *NodeStatusInsightApplyConfiguration {
+func (b *NodeProgressInsightStatusApplyConfiguration) WithPoolResource(value *ResourceRefApplyConfiguration) *NodeProgressInsightStatusApplyConfiguration {
 	b.PoolResource = value
 	return b
 }
@@ -67,7 +58,7 @@ func (b *NodeStatusInsightApplyConfiguration) WithPoolResource(value *PoolResour
 // WithScope sets the Scope field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Scope field is set to the value of the last call.
-func (b *NodeStatusInsightApplyConfiguration) WithScope(value updatev1alpha1.ScopeType) *NodeStatusInsightApplyConfiguration {
+func (b *NodeProgressInsightStatusApplyConfiguration) WithScope(value updatev1alpha1.ScopeType) *NodeProgressInsightStatusApplyConfiguration {
 	b.Scope = &value
 	return b
 }
@@ -75,7 +66,7 @@ func (b *NodeStatusInsightApplyConfiguration) WithScope(value updatev1alpha1.Sco
 // WithVersion sets the Version field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Version field is set to the value of the last call.
-func (b *NodeStatusInsightApplyConfiguration) WithVersion(value string) *NodeStatusInsightApplyConfiguration {
+func (b *NodeProgressInsightStatusApplyConfiguration) WithVersion(value string) *NodeProgressInsightStatusApplyConfiguration {
 	b.Version = &value
 	return b
 }
@@ -83,7 +74,7 @@ func (b *NodeStatusInsightApplyConfiguration) WithVersion(value string) *NodeSta
 // WithEstimatedToComplete sets the EstimatedToComplete field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the EstimatedToComplete field is set to the value of the last call.
-func (b *NodeStatusInsightApplyConfiguration) WithEstimatedToComplete(value metav1.Duration) *NodeStatusInsightApplyConfiguration {
+func (b *NodeProgressInsightStatusApplyConfiguration) WithEstimatedToComplete(value metav1.Duration) *NodeProgressInsightStatusApplyConfiguration {
 	b.EstimatedToComplete = &value
 	return b
 }
@@ -91,7 +82,7 @@ func (b *NodeStatusInsightApplyConfiguration) WithEstimatedToComplete(value meta
 // WithMessage sets the Message field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Message field is set to the value of the last call.
-func (b *NodeStatusInsightApplyConfiguration) WithMessage(value string) *NodeStatusInsightApplyConfiguration {
+func (b *NodeProgressInsightStatusApplyConfiguration) WithMessage(value string) *NodeProgressInsightStatusApplyConfiguration {
 	b.Message = &value
 	return b
 }

@@ -8,29 +8,29 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ClusterVersionStatusInsightApplyConfiguration represents a declarative configuration of the ClusterVersionStatusInsight type for use
+// ClusterVersionProgressInsightStatusApplyConfiguration represents a declarative configuration of the ClusterVersionProgressInsightStatus type for use
 // with apply.
-type ClusterVersionStatusInsightApplyConfiguration struct {
+type ClusterVersionProgressInsightStatusApplyConfiguration struct {
 	Conditions           []v1.ConditionApplyConfiguration              `json:"conditions,omitempty"`
-	Resource             *ResourceRefApplyConfiguration                `json:"resource,omitempty"`
-	Assessment           *updatev1alpha1.ControlPlaneAssessment        `json:"assessment,omitempty"`
+	Name                 *string                                       `json:"name,omitempty"`
+	Assessment           *updatev1alpha1.ClusterVersionAssessment      `json:"assessment,omitempty"`
 	Versions             *ControlPlaneUpdateVersionsApplyConfiguration `json:"versions,omitempty"`
-	Completion           *int32                                        `json:"completion,omitempty"`
+	Completion           *int32                                        `json:"completionPercent,omitempty"`
 	StartedAt            *metav1.Time                                  `json:"startedAt,omitempty"`
 	CompletedAt          *metav1.Time                                  `json:"completedAt,omitempty"`
 	EstimatedCompletedAt *metav1.Time                                  `json:"estimatedCompletedAt,omitempty"`
 }
 
-// ClusterVersionStatusInsightApplyConfiguration constructs a declarative configuration of the ClusterVersionStatusInsight type for use with
+// ClusterVersionProgressInsightStatusApplyConfiguration constructs a declarative configuration of the ClusterVersionProgressInsightStatus type for use with
 // apply.
-func ClusterVersionStatusInsight() *ClusterVersionStatusInsightApplyConfiguration {
-	return &ClusterVersionStatusInsightApplyConfiguration{}
+func ClusterVersionProgressInsightStatus() *ClusterVersionProgressInsightStatusApplyConfiguration {
+	return &ClusterVersionProgressInsightStatusApplyConfiguration{}
 }
 
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Conditions field.
-func (b *ClusterVersionStatusInsightApplyConfiguration) WithConditions(values ...*v1.ConditionApplyConfiguration) *ClusterVersionStatusInsightApplyConfiguration {
+func (b *ClusterVersionProgressInsightStatusApplyConfiguration) WithConditions(values ...*v1.ConditionApplyConfiguration) *ClusterVersionProgressInsightStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithConditions")
@@ -40,18 +40,18 @@ func (b *ClusterVersionStatusInsightApplyConfiguration) WithConditions(values ..
 	return b
 }
 
-// WithResource sets the Resource field in the declarative configuration to the given value
+// WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Resource field is set to the value of the last call.
-func (b *ClusterVersionStatusInsightApplyConfiguration) WithResource(value *ResourceRefApplyConfiguration) *ClusterVersionStatusInsightApplyConfiguration {
-	b.Resource = value
+// If called multiple times, the Name field is set to the value of the last call.
+func (b *ClusterVersionProgressInsightStatusApplyConfiguration) WithName(value string) *ClusterVersionProgressInsightStatusApplyConfiguration {
+	b.Name = &value
 	return b
 }
 
 // WithAssessment sets the Assessment field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Assessment field is set to the value of the last call.
-func (b *ClusterVersionStatusInsightApplyConfiguration) WithAssessment(value updatev1alpha1.ControlPlaneAssessment) *ClusterVersionStatusInsightApplyConfiguration {
+func (b *ClusterVersionProgressInsightStatusApplyConfiguration) WithAssessment(value updatev1alpha1.ClusterVersionAssessment) *ClusterVersionProgressInsightStatusApplyConfiguration {
 	b.Assessment = &value
 	return b
 }
@@ -59,7 +59,7 @@ func (b *ClusterVersionStatusInsightApplyConfiguration) WithAssessment(value upd
 // WithVersions sets the Versions field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Versions field is set to the value of the last call.
-func (b *ClusterVersionStatusInsightApplyConfiguration) WithVersions(value *ControlPlaneUpdateVersionsApplyConfiguration) *ClusterVersionStatusInsightApplyConfiguration {
+func (b *ClusterVersionProgressInsightStatusApplyConfiguration) WithVersions(value *ControlPlaneUpdateVersionsApplyConfiguration) *ClusterVersionProgressInsightStatusApplyConfiguration {
 	b.Versions = value
 	return b
 }
@@ -67,7 +67,7 @@ func (b *ClusterVersionStatusInsightApplyConfiguration) WithVersions(value *Cont
 // WithCompletion sets the Completion field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Completion field is set to the value of the last call.
-func (b *ClusterVersionStatusInsightApplyConfiguration) WithCompletion(value int32) *ClusterVersionStatusInsightApplyConfiguration {
+func (b *ClusterVersionProgressInsightStatusApplyConfiguration) WithCompletion(value int32) *ClusterVersionProgressInsightStatusApplyConfiguration {
 	b.Completion = &value
 	return b
 }
@@ -75,7 +75,7 @@ func (b *ClusterVersionStatusInsightApplyConfiguration) WithCompletion(value int
 // WithStartedAt sets the StartedAt field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the StartedAt field is set to the value of the last call.
-func (b *ClusterVersionStatusInsightApplyConfiguration) WithStartedAt(value metav1.Time) *ClusterVersionStatusInsightApplyConfiguration {
+func (b *ClusterVersionProgressInsightStatusApplyConfiguration) WithStartedAt(value metav1.Time) *ClusterVersionProgressInsightStatusApplyConfiguration {
 	b.StartedAt = &value
 	return b
 }
@@ -83,7 +83,7 @@ func (b *ClusterVersionStatusInsightApplyConfiguration) WithStartedAt(value meta
 // WithCompletedAt sets the CompletedAt field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CompletedAt field is set to the value of the last call.
-func (b *ClusterVersionStatusInsightApplyConfiguration) WithCompletedAt(value metav1.Time) *ClusterVersionStatusInsightApplyConfiguration {
+func (b *ClusterVersionProgressInsightStatusApplyConfiguration) WithCompletedAt(value metav1.Time) *ClusterVersionProgressInsightStatusApplyConfiguration {
 	b.CompletedAt = &value
 	return b
 }
@@ -91,7 +91,7 @@ func (b *ClusterVersionStatusInsightApplyConfiguration) WithCompletedAt(value me
 // WithEstimatedCompletedAt sets the EstimatedCompletedAt field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the EstimatedCompletedAt field is set to the value of the last call.
-func (b *ClusterVersionStatusInsightApplyConfiguration) WithEstimatedCompletedAt(value metav1.Time) *ClusterVersionStatusInsightApplyConfiguration {
+func (b *ClusterVersionProgressInsightStatusApplyConfiguration) WithEstimatedCompletedAt(value metav1.Time) *ClusterVersionProgressInsightStatusApplyConfiguration {
 	b.EstimatedCompletedAt = &value
 	return b
 }

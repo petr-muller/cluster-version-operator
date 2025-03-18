@@ -2,6 +2,22 @@
 
 package v1alpha1
 
-// UpdateStatusListerExpansion allows custom methods to be added to
-// UpdateStatusLister.
-type UpdateStatusListerExpansion interface{}
+// ClusterOperatorProgressInsightListerExpansion allows custom methods to be added to
+// ClusterOperatorProgressInsightLister.
+type ClusterOperatorProgressInsightListerExpansion interface{}
+
+// ClusterVersionProgressInsightListerExpansion allows custom methods to be added to
+// ClusterVersionProgressInsightLister.
+type ClusterVersionProgressInsightListerExpansion interface{}
+
+// HealthInsightListerExpansion allows custom methods to be added to
+// HealthInsightLister.
+type HealthInsightListerExpansion interface{}
+
+// MachineConfigPoolProgressInsightListerExpansion allows custom methods to be added to
+// MachineConfigPoolProgressInsightLister.
+type MachineConfigPoolProgressInsightListerExpansion interface{}
+
+// NodeProgressInsightListerExpansion allows custom methods to be added to
+// NodeProgressInsightLister.
+type NodeProgressInsightListerExpansion interface{}

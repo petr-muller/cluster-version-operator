@@ -23,7 +23,40 @@ func Parser() *typed.Parser {
 var parserOnce sync.Once
 var parser *typed.Parser
 var schemaYAML = typed.YAMLObject(`types:
-- name: com.github.openshift.api.update.v1alpha1.ClusterOperatorStatusInsight
+- name: com.github.openshift.api.update.v1alpha1.ClusterOperatorProgressInsight
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: com.github.openshift.api.update.v1alpha1.ClusterOperatorProgressInsightSpec
+      default: {}
+    - name: status
+      type:
+        namedType: com.github.openshift.api.update.v1alpha1.ClusterOperatorProgressInsightStatus
+      default: {}
+- name: com.github.openshift.api.update.v1alpha1.ClusterOperatorProgressInsightSpec
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
+- name: com.github.openshift.api.update.v1alpha1.ClusterOperatorProgressInsightStatus
   map:
     fields:
     - name: conditions
@@ -38,11 +71,40 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-    - name: resource
+- name: com.github.openshift.api.update.v1alpha1.ClusterVersionProgressInsight
+  map:
+    fields:
+    - name: apiVersion
       type:
-        namedType: com.github.openshift.api.update.v1alpha1.ResourceRef
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
       default: {}
-- name: com.github.openshift.api.update.v1alpha1.ClusterVersionStatusInsight
+    - name: spec
+      type:
+        namedType: com.github.openshift.api.update.v1alpha1.ClusterVersionProgressInsightSpec
+      default: {}
+    - name: status
+      type:
+        namedType: com.github.openshift.api.update.v1alpha1.ClusterVersionProgressInsightStatus
+      default: {}
+- name: com.github.openshift.api.update.v1alpha1.ClusterVersionProgressInsightSpec
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
+- name: com.github.openshift.api.update.v1alpha1.ClusterVersionProgressInsightStatus
   map:
     fields:
     - name: assessment
@@ -52,7 +114,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: completedAt
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: completion
+    - name: completionPercent
       type:
         scalar: numeric
       default: 0
@@ -67,10 +129,10 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: estimatedCompletedAt
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: resource
+    - name: name
       type:
-        namedType: com.github.openshift.api.update.v1alpha1.ResourceRef
-      default: {}
+        scalar: string
+      default: ""
     - name: startedAt
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
@@ -78,107 +140,50 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.openshift.api.update.v1alpha1.ControlPlaneUpdateVersions
       default: {}
-- name: com.github.openshift.api.update.v1alpha1.ControlPlane
-  map:
-    fields:
-    - name: conditions
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
-          elementRelationship: associative
-          keys:
-          - type
-    - name: informers
-      type:
-        list:
-          elementType:
-            namedType: com.github.openshift.api.update.v1alpha1.ControlPlaneInformer
-          elementRelationship: associative
-          keys:
-          - name
-    - name: poolResource
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.PoolResourceRef
-    - name: resource
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.ResourceRef
-- name: com.github.openshift.api.update.v1alpha1.ControlPlaneInformer
-  map:
-    fields:
-    - name: insights
-      type:
-        list:
-          elementType:
-            namedType: com.github.openshift.api.update.v1alpha1.ControlPlaneInsight
-          elementRelationship: associative
-          keys:
-          - uid
-    - name: name
-      type:
-        scalar: string
-      default: ""
-- name: com.github.openshift.api.update.v1alpha1.ControlPlaneInsight
-  map:
-    fields:
-    - name: acquiredAt
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: insight
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.ControlPlaneInsightUnion
-      default: {}
-    - name: uid
-      type:
-        scalar: string
-      default: ""
-- name: com.github.openshift.api.update.v1alpha1.ControlPlaneInsightUnion
-  map:
-    fields:
-    - name: clusterOperator
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.ClusterOperatorStatusInsight
-    - name: clusterVersion
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.ClusterVersionStatusInsight
-    - name: health
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.HealthInsight
-    - name: machineConfigPool
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.MachineConfigPoolStatusInsight
-    - name: node
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.NodeStatusInsight
-    - name: type
-      type:
-        scalar: string
-      default: ""
-    unions:
-    - discriminator: type
-      fields:
-      - fieldName: clusterOperator
-        discriminatorValue: ClusterOperatorStatusInsight
-      - fieldName: clusterVersion
-        discriminatorValue: ClusterVersionStatusInsight
-      - fieldName: health
-        discriminatorValue: HealthInsight
-      - fieldName: machineConfigPool
-        discriminatorValue: MachineConfigPoolStatusInsight
-      - fieldName: node
-        discriminatorValue: NodeStatusInsight
 - name: com.github.openshift.api.update.v1alpha1.ControlPlaneUpdateVersions
   map:
     fields:
     - name: previous
       type:
         namedType: com.github.openshift.api.update.v1alpha1.Version
-      default: {}
     - name: target
       type:
         namedType: com.github.openshift.api.update.v1alpha1.Version
       default: {}
 - name: com.github.openshift.api.update.v1alpha1.HealthInsight
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: com.github.openshift.api.update.v1alpha1.HealthInsightSpec
+      default: {}
+    - name: status
+      type:
+        namedType: com.github.openshift.api.update.v1alpha1.HealthInsightStatus
+      default: {}
+- name: com.github.openshift.api.update.v1alpha1.HealthInsightSpec
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
+- name: com.github.openshift.api.update.v1alpha1.HealthInsightStatus
   map:
     fields:
     - name: impact
@@ -237,14 +242,47 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: com.github.openshift.api.update.v1alpha1.MachineConfigPoolStatusInsight
+- name: com.github.openshift.api.update.v1alpha1.MachineConfigPoolProgressInsight
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: com.github.openshift.api.update.v1alpha1.MachineConfigPoolProgressInsightSpec
+      default: {}
+    - name: status
+      type:
+        namedType: com.github.openshift.api.update.v1alpha1.MachineConfigPoolProgressInsightStatus
+      default: {}
+- name: com.github.openshift.api.update.v1alpha1.MachineConfigPoolProgressInsightSpec
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
+- name: com.github.openshift.api.update.v1alpha1.MachineConfigPoolProgressInsightStatus
   map:
     fields:
     - name: assessment
       type:
         scalar: string
       default: ""
-    - name: completion
+    - name: completionPercent
       type:
         scalar: numeric
       default: 0
@@ -260,10 +298,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-    - name: resource
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.PoolResourceRef
-      default: {}
     - name: scopeType
       type:
         scalar: string
@@ -276,7 +310,40 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - type
-- name: com.github.openshift.api.update.v1alpha1.NodeStatusInsight
+- name: com.github.openshift.api.update.v1alpha1.NodeProgressInsight
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: com.github.openshift.api.update.v1alpha1.NodeProgressInsightSpec
+      default: {}
+    - name: status
+      type:
+        namedType: com.github.openshift.api.update.v1alpha1.NodeProgressInsightStatus
+      default: {}
+- name: com.github.openshift.api.update.v1alpha1.NodeProgressInsightSpec
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
+- name: com.github.openshift.api.update.v1alpha1.NodeProgressInsightStatus
   map:
     fields:
     - name: conditions
@@ -299,10 +366,6 @@ var schemaYAML = typed.YAMLObject(`types:
       default: ""
     - name: poolResource
       type:
-        namedType: com.github.openshift.api.update.v1alpha1.PoolResourceRef
-      default: {}
-    - name: resource
-      type:
         namedType: com.github.openshift.api.update.v1alpha1.ResourceRef
       default: {}
     - name: scopeType
@@ -323,50 +386,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: com.github.openshift.api.update.v1alpha1.Pool
-  map:
-    fields:
-    - name: conditions
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
-          elementRelationship: associative
-          keys:
-          - type
-    - name: informers
-      type:
-        list:
-          elementType:
-            namedType: com.github.openshift.api.update.v1alpha1.WorkerPoolInformer
-          elementRelationship: associative
-          keys:
-          - name
-    - name: name
-      type:
-        scalar: string
-      default: ""
-    - name: resource
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.PoolResourceRef
-      default: {}
-- name: com.github.openshift.api.update.v1alpha1.PoolResourceRef
-  map:
-    fields:
-    - name: group
-      type:
-        scalar: string
-    - name: name
-      type:
-        scalar: string
-      default: ""
-    - name: namespace
-      type:
-        scalar: string
-    - name: resource
-      type:
-        scalar: string
-      default: ""
 - name: com.github.openshift.api.update.v1alpha1.ResourceRef
   map:
     fields:
@@ -384,61 +403,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: com.github.openshift.api.update.v1alpha1.UpdateStatus
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-      default: {}
-    - name: spec
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.UpdateStatusSpec
-      default: {}
-    - name: status
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.UpdateStatusStatus
-      default: {}
-- name: com.github.openshift.api.update.v1alpha1.UpdateStatusSpec
-  map:
-    elementType:
-      scalar: untyped
-      list:
-        elementType:
-          namedType: __untyped_atomic_
-        elementRelationship: atomic
-      map:
-        elementType:
-          namedType: __untyped_deduced_
-        elementRelationship: separable
-- name: com.github.openshift.api.update.v1alpha1.UpdateStatusStatus
-  map:
-    fields:
-    - name: conditions
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
-          elementRelationship: associative
-          keys:
-          - type
-    - name: controlPlane
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.ControlPlane
-    - name: workerPools
-      type:
-        list:
-          elementType:
-            namedType: com.github.openshift.api.update.v1alpha1.Pool
-          elementRelationship: associative
-          keys:
-          - name
 - name: com.github.openshift.api.update.v1alpha1.Version
   map:
     fields:
@@ -453,7 +417,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: version
       type:
         scalar: string
-      default: ""
 - name: com.github.openshift.api.update.v1alpha1.VersionMetadata
   map:
     fields:
@@ -464,60 +427,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: value
       type:
         scalar: string
-- name: com.github.openshift.api.update.v1alpha1.WorkerPoolInformer
-  map:
-    fields:
-    - name: insights
-      type:
-        list:
-          elementType:
-            namedType: com.github.openshift.api.update.v1alpha1.WorkerPoolInsight
-          elementRelationship: associative
-          keys:
-          - uid
-    - name: name
-      type:
-        scalar: string
-      default: ""
-- name: com.github.openshift.api.update.v1alpha1.WorkerPoolInsight
-  map:
-    fields:
-    - name: acquiredAt
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: insight
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.WorkerPoolInsightUnion
-      default: {}
-    - name: uid
-      type:
-        scalar: string
-      default: ""
-- name: com.github.openshift.api.update.v1alpha1.WorkerPoolInsightUnion
-  map:
-    fields:
-    - name: health
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.HealthInsight
-    - name: machineConfigPool
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.MachineConfigPoolStatusInsight
-    - name: node
-      type:
-        namedType: com.github.openshift.api.update.v1alpha1.NodeStatusInsight
-    - name: type
-      type:
-        scalar: string
-      default: ""
-    unions:
-    - discriminator: type
-      fields:
-      - fieldName: health
-        discriminatorValue: HealthInsight
-      - fieldName: machineConfigPool
-        discriminatorValue: MachineConfigPoolStatusInsight
-      - fieldName: node
-        discriminatorValue: NodeStatusInsight
 - name: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
   map:
     fields:

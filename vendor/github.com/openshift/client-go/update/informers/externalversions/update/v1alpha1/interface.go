@@ -8,8 +8,16 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// UpdateStatuses returns a UpdateStatusInformer.
-	UpdateStatuses() UpdateStatusInformer
+	// ClusterOperatorProgressInsights returns a ClusterOperatorProgressInsightInformer.
+	ClusterOperatorProgressInsights() ClusterOperatorProgressInsightInformer
+	// ClusterVersionProgressInsights returns a ClusterVersionProgressInsightInformer.
+	ClusterVersionProgressInsights() ClusterVersionProgressInsightInformer
+	// HealthInsights returns a HealthInsightInformer.
+	HealthInsights() HealthInsightInformer
+	// MachineConfigPoolProgressInsights returns a MachineConfigPoolProgressInsightInformer.
+	MachineConfigPoolProgressInsights() MachineConfigPoolProgressInsightInformer
+	// NodeProgressInsights returns a NodeProgressInsightInformer.
+	NodeProgressInsights() NodeProgressInsightInformer
 }
 
 type version struct {
@@ -23,7 +31,27 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// UpdateStatuses returns a UpdateStatusInformer.
-func (v *version) UpdateStatuses() UpdateStatusInformer {
-	return &updateStatusInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+// ClusterOperatorProgressInsights returns a ClusterOperatorProgressInsightInformer.
+func (v *version) ClusterOperatorProgressInsights() ClusterOperatorProgressInsightInformer {
+	return &clusterOperatorProgressInsightInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ClusterVersionProgressInsights returns a ClusterVersionProgressInsightInformer.
+func (v *version) ClusterVersionProgressInsights() ClusterVersionProgressInsightInformer {
+	return &clusterVersionProgressInsightInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// HealthInsights returns a HealthInsightInformer.
+func (v *version) HealthInsights() HealthInsightInformer {
+	return &healthInsightInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// MachineConfigPoolProgressInsights returns a MachineConfigPoolProgressInsightInformer.
+func (v *version) MachineConfigPoolProgressInsights() MachineConfigPoolProgressInsightInformer {
+	return &machineConfigPoolProgressInsightInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// NodeProgressInsights returns a NodeProgressInsightInformer.
+func (v *version) NodeProgressInsights() NodeProgressInsightInformer {
+	return &nodeProgressInsightInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

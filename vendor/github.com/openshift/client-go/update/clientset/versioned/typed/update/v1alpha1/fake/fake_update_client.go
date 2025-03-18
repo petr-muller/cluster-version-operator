@@ -12,8 +12,24 @@ type FakeUpdateV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeUpdateV1alpha1) UpdateStatuses() v1alpha1.UpdateStatusInterface {
-	return newFakeUpdateStatuses(c)
+func (c *FakeUpdateV1alpha1) ClusterOperatorProgressInsights() v1alpha1.ClusterOperatorProgressInsightInterface {
+	return newFakeClusterOperatorProgressInsights(c)
+}
+
+func (c *FakeUpdateV1alpha1) ClusterVersionProgressInsights() v1alpha1.ClusterVersionProgressInsightInterface {
+	return newFakeClusterVersionProgressInsights(c)
+}
+
+func (c *FakeUpdateV1alpha1) HealthInsights() v1alpha1.HealthInsightInterface {
+	return newFakeHealthInsights(c)
+}
+
+func (c *FakeUpdateV1alpha1) MachineConfigPoolProgressInsights() v1alpha1.MachineConfigPoolProgressInsightInterface {
+	return newFakeMachineConfigPoolProgressInsights(c)
+}
+
+func (c *FakeUpdateV1alpha1) NodeProgressInsights() v1alpha1.NodeProgressInsightInterface {
+	return newFakeNodeProgressInsights(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

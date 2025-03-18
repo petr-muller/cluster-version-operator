@@ -2,4 +2,12 @@
 
 package v1alpha1
 
-type UpdateStatusExpansion interface{}
+type ClusterOperatorProgressInsightExpansion interface{}
+
+type ClusterVersionProgressInsightExpansion interface{}
+
+type HealthInsightExpansion interface{}
+
+type MachineConfigPoolProgressInsightExpansion interface{}
+
+type NodeProgressInsightExpansion interface{}

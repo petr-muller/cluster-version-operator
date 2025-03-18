@@ -12,7 +12,11 @@ import (
 
 type UpdateV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	UpdateStatusesGetter
+	ClusterOperatorProgressInsightsGetter
+	ClusterVersionProgressInsightsGetter
+	HealthInsightsGetter
+	MachineConfigPoolProgressInsightsGetter
+	NodeProgressInsightsGetter
 }
 
 // UpdateV1alpha1Client is used to interact with features provided by the update.openshift.io group.
@@ -20,8 +24,24 @@ type UpdateV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *UpdateV1alpha1Client) UpdateStatuses() UpdateStatusInterface {
-	return newUpdateStatuses(c)
+func (c *UpdateV1alpha1Client) ClusterOperatorProgressInsights() ClusterOperatorProgressInsightInterface {
+	return newClusterOperatorProgressInsights(c)
+}
+
+func (c *UpdateV1alpha1Client) ClusterVersionProgressInsights() ClusterVersionProgressInsightInterface {
+	return newClusterVersionProgressInsights(c)
+}
+
+func (c *UpdateV1alpha1Client) HealthInsights() HealthInsightInterface {
+	return newHealthInsights(c)
+}
+
+func (c *UpdateV1alpha1Client) MachineConfigPoolProgressInsights() MachineConfigPoolProgressInsightInterface {
+	return newMachineConfigPoolProgressInsights(c)
+}
+
+func (c *UpdateV1alpha1Client) NodeProgressInsights() NodeProgressInsightInterface {
+	return newNodeProgressInsights(c)
 }
 
 // NewForConfig creates a new UpdateV1alpha1Client for the given config.

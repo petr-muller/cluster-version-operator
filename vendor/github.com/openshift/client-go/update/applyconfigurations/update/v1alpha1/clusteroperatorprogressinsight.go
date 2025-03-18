@@ -11,56 +11,56 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// HealthInsightApplyConfiguration represents a declarative configuration of the HealthInsight type for use
+// ClusterOperatorProgressInsightApplyConfiguration represents a declarative configuration of the ClusterOperatorProgressInsight type for use
 // with apply.
-type HealthInsightApplyConfiguration struct {
+type ClusterOperatorProgressInsightApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *updatev1alpha1.HealthInsightSpec      `json:"spec,omitempty"`
-	Status                           *HealthInsightStatusApplyConfiguration `json:"status,omitempty"`
+	Spec                             *updatev1alpha1.ClusterOperatorProgressInsightSpec      `json:"spec,omitempty"`
+	Status                           *ClusterOperatorProgressInsightStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// HealthInsight constructs a declarative configuration of the HealthInsight type for use with
+// ClusterOperatorProgressInsight constructs a declarative configuration of the ClusterOperatorProgressInsight type for use with
 // apply.
-func HealthInsight(name string) *HealthInsightApplyConfiguration {
-	b := &HealthInsightApplyConfiguration{}
+func ClusterOperatorProgressInsight(name string) *ClusterOperatorProgressInsightApplyConfiguration {
+	b := &ClusterOperatorProgressInsightApplyConfiguration{}
 	b.WithName(name)
-	b.WithKind("HealthInsight")
+	b.WithKind("ClusterOperatorProgressInsight")
 	b.WithAPIVersion("update.openshift.io/v1alpha1")
 	return b
 }
 
-// ExtractHealthInsight extracts the applied configuration owned by fieldManager from
-// healthInsight. If no managedFields are found in healthInsight for fieldManager, a
-// HealthInsightApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// ExtractClusterOperatorProgressInsight extracts the applied configuration owned by fieldManager from
+// clusterOperatorProgressInsight. If no managedFields are found in clusterOperatorProgressInsight for fieldManager, a
+// ClusterOperatorProgressInsightApplyConfiguration is returned with only the Name, Namespace (if applicable),
 // APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
-// healthInsight must be a unmodified HealthInsight API object that was retrieved from the Kubernetes API.
-// ExtractHealthInsight provides a way to perform a extract/modify-in-place/apply workflow.
+// clusterOperatorProgressInsight must be a unmodified ClusterOperatorProgressInsight API object that was retrieved from the Kubernetes API.
+// ExtractClusterOperatorProgressInsight provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractHealthInsight(healthInsight *updatev1alpha1.HealthInsight, fieldManager string) (*HealthInsightApplyConfiguration, error) {
-	return extractHealthInsight(healthInsight, fieldManager, "")
+func ExtractClusterOperatorProgressInsight(clusterOperatorProgressInsight *updatev1alpha1.ClusterOperatorProgressInsight, fieldManager string) (*ClusterOperatorProgressInsightApplyConfiguration, error) {
+	return extractClusterOperatorProgressInsight(clusterOperatorProgressInsight, fieldManager, "")
 }
 
-// ExtractHealthInsightStatus is the same as ExtractHealthInsight except
+// ExtractClusterOperatorProgressInsightStatus is the same as ExtractClusterOperatorProgressInsight except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractHealthInsightStatus(healthInsight *updatev1alpha1.HealthInsight, fieldManager string) (*HealthInsightApplyConfiguration, error) {
-	return extractHealthInsight(healthInsight, fieldManager, "status")
+func ExtractClusterOperatorProgressInsightStatus(clusterOperatorProgressInsight *updatev1alpha1.ClusterOperatorProgressInsight, fieldManager string) (*ClusterOperatorProgressInsightApplyConfiguration, error) {
+	return extractClusterOperatorProgressInsight(clusterOperatorProgressInsight, fieldManager, "status")
 }
 
-func extractHealthInsight(healthInsight *updatev1alpha1.HealthInsight, fieldManager string, subresource string) (*HealthInsightApplyConfiguration, error) {
-	b := &HealthInsightApplyConfiguration{}
-	err := managedfields.ExtractInto(healthInsight, internal.Parser().Type("com.github.openshift.api.update.v1alpha1.HealthInsight"), fieldManager, b, subresource)
+func extractClusterOperatorProgressInsight(clusterOperatorProgressInsight *updatev1alpha1.ClusterOperatorProgressInsight, fieldManager string, subresource string) (*ClusterOperatorProgressInsightApplyConfiguration, error) {
+	b := &ClusterOperatorProgressInsightApplyConfiguration{}
+	err := managedfields.ExtractInto(clusterOperatorProgressInsight, internal.Parser().Type("com.github.openshift.api.update.v1alpha1.ClusterOperatorProgressInsight"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}
-	b.WithName(healthInsight.Name)
+	b.WithName(clusterOperatorProgressInsight.Name)
 
-	b.WithKind("HealthInsight")
+	b.WithKind("ClusterOperatorProgressInsight")
 	b.WithAPIVersion("update.openshift.io/v1alpha1")
 	return b, nil
 }
@@ -68,7 +68,7 @@ func extractHealthInsight(healthInsight *updatev1alpha1.HealthInsight, fieldMana
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
-func (b *HealthInsightApplyConfiguration) WithKind(value string) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithKind(value string) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
@@ -76,7 +76,7 @@ func (b *HealthInsightApplyConfiguration) WithKind(value string) *HealthInsightA
 // WithAPIVersion sets the APIVersion field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
-func (b *HealthInsightApplyConfiguration) WithAPIVersion(value string) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithAPIVersion(value string) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
@@ -84,7 +84,7 @@ func (b *HealthInsightApplyConfiguration) WithAPIVersion(value string) *HealthIn
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *HealthInsightApplyConfiguration) WithName(value string) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithName(value string) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
@@ -93,7 +93,7 @@ func (b *HealthInsightApplyConfiguration) WithName(value string) *HealthInsightA
 // WithGenerateName sets the GenerateName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the GenerateName field is set to the value of the last call.
-func (b *HealthInsightApplyConfiguration) WithGenerateName(value string) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithGenerateName(value string) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
@@ -102,7 +102,7 @@ func (b *HealthInsightApplyConfiguration) WithGenerateName(value string) *Health
 // WithNamespace sets the Namespace field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Namespace field is set to the value of the last call.
-func (b *HealthInsightApplyConfiguration) WithNamespace(value string) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithNamespace(value string) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
@@ -111,7 +111,7 @@ func (b *HealthInsightApplyConfiguration) WithNamespace(value string) *HealthIns
 // WithUID sets the UID field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the UID field is set to the value of the last call.
-func (b *HealthInsightApplyConfiguration) WithUID(value types.UID) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithUID(value types.UID) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
@@ -120,7 +120,7 @@ func (b *HealthInsightApplyConfiguration) WithUID(value types.UID) *HealthInsigh
 // WithResourceVersion sets the ResourceVersion field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
-func (b *HealthInsightApplyConfiguration) WithResourceVersion(value string) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithResourceVersion(value string) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
@@ -129,7 +129,7 @@ func (b *HealthInsightApplyConfiguration) WithResourceVersion(value string) *Hea
 // WithGeneration sets the Generation field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Generation field is set to the value of the last call.
-func (b *HealthInsightApplyConfiguration) WithGeneration(value int64) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithGeneration(value int64) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
@@ -138,7 +138,7 @@ func (b *HealthInsightApplyConfiguration) WithGeneration(value int64) *HealthIns
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *HealthInsightApplyConfiguration) WithCreationTimestamp(value metav1.Time) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
@@ -147,7 +147,7 @@ func (b *HealthInsightApplyConfiguration) WithCreationTimestamp(value metav1.Tim
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *HealthInsightApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
@@ -156,7 +156,7 @@ func (b *HealthInsightApplyConfiguration) WithDeletionTimestamp(value metav1.Tim
 // WithDeletionGracePeriodSeconds sets the DeletionGracePeriodSeconds field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
-func (b *HealthInsightApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
@@ -166,7 +166,7 @@ func (b *HealthInsightApplyConfiguration) WithDeletionGracePeriodSeconds(value i
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Labels field,
 // overwriting an existing map entries in Labels field with the same key.
-func (b *HealthInsightApplyConfiguration) WithLabels(entries map[string]string) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithLabels(entries map[string]string) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
 		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
@@ -181,7 +181,7 @@ func (b *HealthInsightApplyConfiguration) WithLabels(entries map[string]string) 
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Annotations field,
 // overwriting an existing map entries in Annotations field with the same key.
-func (b *HealthInsightApplyConfiguration) WithAnnotations(entries map[string]string) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithAnnotations(entries map[string]string) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
 		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
@@ -195,7 +195,7 @@ func (b *HealthInsightApplyConfiguration) WithAnnotations(entries map[string]str
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *HealthInsightApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -209,7 +209,7 @@ func (b *HealthInsightApplyConfiguration) WithOwnerReferences(values ...*v1.Owne
 // WithFinalizers adds the given value to the Finalizers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Finalizers field.
-func (b *HealthInsightApplyConfiguration) WithFinalizers(values ...string) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithFinalizers(values ...string) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
@@ -217,7 +217,7 @@ func (b *HealthInsightApplyConfiguration) WithFinalizers(values ...string) *Heal
 	return b
 }
 
-func (b *HealthInsightApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
 		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
 	}
@@ -226,7 +226,7 @@ func (b *HealthInsightApplyConfiguration) ensureObjectMetaApplyConfigurationExis
 // WithSpec sets the Spec field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Spec field is set to the value of the last call.
-func (b *HealthInsightApplyConfiguration) WithSpec(value updatev1alpha1.HealthInsightSpec) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithSpec(value updatev1alpha1.ClusterOperatorProgressInsightSpec) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.Spec = &value
 	return b
 }
@@ -234,13 +234,13 @@ func (b *HealthInsightApplyConfiguration) WithSpec(value updatev1alpha1.HealthIn
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *HealthInsightApplyConfiguration) WithStatus(value *HealthInsightStatusApplyConfiguration) *HealthInsightApplyConfiguration {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) WithStatus(value *ClusterOperatorProgressInsightStatusApplyConfiguration) *ClusterOperatorProgressInsightApplyConfiguration {
 	b.Status = value
 	return b
 }
 
 // GetName retrieves the value of the Name field in the declarative configuration.
-func (b *HealthInsightApplyConfiguration) GetName() *string {
+func (b *ClusterOperatorProgressInsightApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
 }

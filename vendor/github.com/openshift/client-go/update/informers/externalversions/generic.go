@@ -37,8 +37,16 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=update.openshift.io, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithResource("updatestatuses"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Update().V1alpha1().UpdateStatuses().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("clusteroperatorprogressinsights"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Update().V1alpha1().ClusterOperatorProgressInsights().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("clusterversionprogressinsights"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Update().V1alpha1().ClusterVersionProgressInsights().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("healthinsights"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Update().V1alpha1().HealthInsights().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("machineconfigpoolprogressinsights"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Update().V1alpha1().MachineConfigPoolProgressInsights().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("nodeprogressinsights"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Update().V1alpha1().NodeProgressInsights().Informer()}, nil
 
 	}
 

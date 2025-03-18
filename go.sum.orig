@@ -152,10 +152,22 @@ github.com/operator-framework/api v0.17.1/go.mod h1:kk8xJahHJR3bKqrA+A+1VIrhOTmy
 github.com/operator-framework/operator-lifecycle-manager v0.22.0 h1:7DEWOq24HQ0l5xPOXMhn17XaJACgwoipz+JfQ7QCXZw=
 github.com/operator-framework/operator-lifecycle-manager v0.22.0/go.mod h1:4zssIIl23ohxS1nXRU9xTkBmwt+qleuHMO02BaWOHLA=
 github.com/orisano/pixelmatch v0.0.0-20220722002657-fb0b55479cde/go.mod h1:nZgzbfBr3hhjoZnS66nKrHmduYNpc34ny7RK4z5/HM0=
+<<<<<<< HEAD
 github.com/petr-muller/api v0.0.0-20250327170451-bb998d952ce9 h1:APtw651GNymjs4/pgvRViJSOmGpgDLYCkkXUHswrjbk=
 github.com/petr-muller/api v0.0.0-20250327170451-bb998d952ce9/go.mod h1:yk60tHAmHhtVpJQo3TwVYq2zpuP70iJIFDCmeKMIzPw=
-github.com/petr-muller/openshift-client-go v0.0.0-20250327175535-20839bb9af04 h1:CgXhcyjjFVtGuZBft5eUb066dv1wm2lHkmtiAACMDM4=
-github.com/petr-muller/openshift-client-go v0.0.0-20250327175535-20839bb9af04/go.mod h1:V6S17iOC5NY6bm0CqNEmYgvC/bwthsaysYkdKJDVTsE=
+github.com/petr-muller/openshift-client-go v0.0.0-20250317150702-f9791866507f h1:u1ShXKt9cBrim7FCX0ccc7iTJ/jhKY2XZMjC4rtvEo0=
+github.com/petr-muller/openshift-client-go v0.0.0-20250317150702-f9791866507f/go.mod h1:gTiGkvFUhdNExR0k5DnQNBb8eESSwPvQ+Ibgu78S72A=
+||||||| parent of 2909a203 (github.com/openshift/client-go => github.com/petr-muller/openshift-client-go@update-status-operator-minimal)
+github.com/petr-muller/api v0.0.0-20250313185600-495b1476fda0 h1:1AUhbjjzW+cDpVJ0J2JsNZiC8YJQBwoHIVU8BDMZUvo=
+github.com/petr-muller/api v0.0.0-20250313185600-495b1476fda0/go.mod h1:yk60tHAmHhtVpJQo3TwVYq2zpuP70iJIFDCmeKMIzPw=
+github.com/petr-muller/openshift-client-go v0.0.0-20250317150702-f9791866507f h1:u1ShXKt9cBrim7FCX0ccc7iTJ/jhKY2XZMjC4rtvEo0=
+github.com/petr-muller/openshift-client-go v0.0.0-20250317150702-f9791866507f/go.mod h1:gTiGkvFUhdNExR0k5DnQNBb8eESSwPvQ+Ibgu78S72A=
+=======
+github.com/petr-muller/api v0.0.0-20250313185600-495b1476fda0 h1:1AUhbjjzW+cDpVJ0J2JsNZiC8YJQBwoHIVU8BDMZUvo=
+github.com/petr-muller/api v0.0.0-20250313185600-495b1476fda0/go.mod h1:yk60tHAmHhtVpJQo3TwVYq2zpuP70iJIFDCmeKMIzPw=
+github.com/petr-muller/openshift-client-go v0.0.0-20250317173629-9f2588c6ef77 h1:dhCH/t5v5e4YVncVMSUw/H1auoZUJhvvHAs9JpM+hnI=
+github.com/petr-muller/openshift-client-go v0.0.0-20250317173629-9f2588c6ef77/go.mod h1:4L4QyA82VtRy+L8W1Hirnk0fQzxBtz6MnhYBSPUmrWw=
+>>>>>>> 2909a203 (github.com/openshift/client-go => github.com/petr-muller/openshift-client-go@update-status-operator-minimal)
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/profile v1.7.0 h1:hnbDkaNWPCLMO9wGLdBFTIZvzDrDfBM2072E1S9gJkA=

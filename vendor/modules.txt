@@ -170,7 +170,7 @@ github.com/munnerz/goautoneg
 # github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f
 ## explicit
 github.com/mwitkow/go-conntrack
-# github.com/openshift/api v0.0.0-20250313134101-8a7efbfb5316 => github.com/petr-muller/api v0.0.0-20250327170451-bb998d952ce9
+# github.com/openshift/api v0.0.0-20250325155304-0f14a211af33 => github.com/petr-muller/api v0.0.0-20250327170451-bb998d952ce9
 ## explicit; go 1.23.0
 github.com/openshift/api/config
 github.com/openshift/api/config/v1
@@ -189,7 +189,7 @@ github.com/openshift/api/operator/v1alpha1/zz_generated.crd-manifests
 github.com/openshift/api/security/v1
 github.com/openshift/api/update/v1alpha1
 github.com/openshift/api/update/v1alpha1/zz_generated.crd-manifests
-# github.com/openshift/client-go v0.0.0-20250131180035-f7ec47e2d87a => github.com/petr-muller/openshift-client-go v0.0.0-20250317150702-f9791866507f
+# github.com/openshift/client-go v0.0.0-20250131180035-f7ec47e2d87a => github.com/petr-muller/openshift-client-go v0.0.0-20250327175535-20839bb9af04
 ## explicit; go 1.23.0
 github.com/openshift/client-go/config/applyconfigurations
 github.com/openshift/client-go/config/applyconfigurations/config/v1
@@ -1381,4 +1381,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 # github.com/openshift/api => github.com/petr-muller/api v0.0.0-20250327170451-bb998d952ce9
-# github.com/openshift/client-go => github.com/petr-muller/openshift-client-go v0.0.0-20250317150702-f9791866507f
+# github.com/openshift/client-go => github.com/petr-muller/openshift-client-go v0.0.0-20250327175535-20839bb9af04
