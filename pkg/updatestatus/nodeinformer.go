@@ -355,7 +355,7 @@ func (c *nodeInformerController) syncNode(ctx context.Context, name string) (*in
 	now := c.now()
 	var msg informerMsg
 	if insight := assessNode(node, mcp, c.machineConfigVersions.versionFor, mostRecentVersionInCVHistory, now); insight != nil {
-		msg, err = makeInsightMsgForNode(insight, now)
+		msg, err = makeInsightMsgForNode(insight)
 		if err != nil {
 			klog.Errorf("BUG: Could not create insight message: %v", err)
 			return nil, nil
@@ -372,17 +372,9 @@ func (c *nodeInformerController) syncSyntheticKey(name string, q workqueue.Typed
 	return nil
 }
 
-func makeInsightMsgForNode(nodeInsight *updatestatus.NodeStatusInsight, acquiredAt metav1.Time) (informerMsg, error) {
-	insight := updatestatus.WorkerPoolInsight{
-		UID:        fmt.Sprintf("node-%s", strings.Replace(nodeInsight.Resource.Name, ".", "-", -1)),
-		AcquiredAt: acquiredAt,
-		Insight: updatestatus.WorkerPoolInsightUnion{
-			Type:              updatestatus.NodeStatusInsightType,
-			NodeStatusInsight: nodeInsight,
-		},
-	}
-
-	return makeWorkerPoolsInsightMsg(insight, nodesInformerName)
+func makeInsightMsgForNode(nodeInsight *updatestatus.NodeProgressInsightStatus) (informerMsg, error) {
+	uid := strings.Replace(nodeInsight.Name, ".", "-", -1)
+	return makeNodeProgressInsightMsg(nodeInsight, uid, nodesInformerName)
 }
 
 func isNodeDegraded(node *corev1.Node) bool {
@@ -530,7 +522,7 @@ func toPointer(d time.Duration) *metav1.Duration {
 	return &v
 }
 
-func assessNode(node *corev1.Node, mcp *machineconfigv1.MachineConfigPool, machineConfigToVersion func(string) (string, bool), mostRecentVersionInCVHistory string, now metav1.Time) *updatestatus.NodeStatusInsight {
+func assessNode(node *corev1.Node, mcp *machineconfigv1.MachineConfigPool, machineConfigToVersion func(string) (string, bool), mostRecentVersionInCVHistory string, now metav1.Time) *updatestatus.NodeProgressInsightStatus {
 	if node == nil || mcp == nil {
 		return nil
 	}
@@ -561,19 +553,12 @@ func assessNode(node *corev1.Node, mcp *machineconfigv1.MachineConfigPool, machi
 		scope = updatestatus.ControlPlaneScope
 	}
 
-	return &updatestatus.NodeStatusInsight{
+	return &updatestatus.NodeProgressInsightStatus{
 		Name: node.Name,
-		Resource: updatestatus.ResourceRef{
-			Resource: "nodes",
-			Group:    corev1.GroupName,
-			Name:     node.Name,
-		},
-		PoolResource: updatestatus.PoolResourceRef{
-			ResourceRef: updatestatus.ResourceRef{
-				Resource: "machineconfigpools",
-				Group:    machineconfigv1.GroupName,
-				Name:     mcp.Name,
-			},
+		PoolResource: updatestatus.ResourceRef{
+			Resource: "machineconfigpools",
+			Group:    machineconfigv1.GroupName,
+			Name:     mcp.Name,
 		},
 		Scope:               scope,
 		Version:             currentVersion,

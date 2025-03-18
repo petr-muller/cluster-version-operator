@@ -29,9 +29,9 @@ import (
 	updatestatus "github.com/openshift/api/update/v1alpha1"
 )
 
-func newClusterVersionStatusInsightUpdating(status metav1.ConditionStatus, reason updatestatus.ClusterVersionStatusInsightUpdatingReason, message string, lastTransitionTime metav1.Time) metav1.Condition {
+func newClusterVersionStatusInsightUpdating(status metav1.ConditionStatus, reason updatestatus.ClusterVersionProgressInsightUpdatingReason, message string, lastTransitionTime metav1.Time) metav1.Condition {
 	return metav1.Condition{
-		Type:               string(updatestatus.ClusterVersionStatusInsightUpdating),
+		Type:               string(updatestatus.ClusterVersionProgressInsightUpdating),
 		Status:             status,
 		Reason:             string(reason),
 		Message:            message,
@@ -52,6 +52,7 @@ func Test_sync_with_cv(t *testing.T) {
 		Reason:  "ProgressingTrue",
 		Message: "Cluster is progressing",
 	}
+
 	progressingFalse := configv1.ClusterOperatorStatusCondition{
 		Type:    configv1.OperatorProgressing,
 		Status:  configv1.ConditionFalse,
@@ -89,41 +90,36 @@ func Test_sync_with_cv(t *testing.T) {
 		cvHistory     []configv1.UpdateHistory
 		cvAnnotations map[string]string
 
-		expectedMsgs map[string]updatestatus.ControlPlaneInsight
+		expectedMsgs []informerMsg
 	}{
 		{
 			name:          "Cluster during installation",
 			cvProgressing: &progressingTrue,
 			cvHistory:     []configv1.UpdateHistory{inProgress418},
-			expectedMsgs: map[string]updatestatus.ControlPlaneInsight{
-				"cv-version": {
-					UID:        "cv-version",
-					AcquiredAt: now,
-					Insight: updatestatus.ControlPlaneInsightUnion{
-						Type: updatestatus.ClusterVersionStatusInsightType,
-						ClusterVersionStatusInsight: &updatestatus.ClusterVersionStatusInsight{
-							Resource:   cvRef,
-							Assessment: updatestatus.ControlPlaneAssessmentProgressing,
-							Versions: updatestatus.ControlPlaneUpdateVersions{
-								Previous: updatestatus.Version{
-									Version:  "<none>",
-									Metadata: []updatestatus.VersionMetadata{{Key: updatestatus.InstallationMetadata}},
-								},
-								Target: updatestatus.Version{
-									Version: "4.18.0",
-								},
+			expectedMsgs: []informerMsg{
+				{
+					informer: controlPlaneInformerName,
+					uid:      "version",
+					cvInsight: &updatestatus.ClusterVersionProgressInsightStatus{
+						Assessment: updatestatus.ClusterVersionAssessmentProgressing,
+						Name:       "version",
+						Versions: updatestatus.ControlPlaneUpdateVersions{
+							Previous: nil,
+							Target: updatestatus.Version{
+								Version:  "4.18.0",
+								Metadata: []updatestatus.VersionMetadata{{Key: updatestatus.InstallationMetadata}},
 							},
-							Completion:           0,
-							StartedAt:            minutesAgo[90],
-							EstimatedCompletedAt: &minutesAgo[30],
-							Conditions: []metav1.Condition{
-								newClusterVersionStatusInsightUpdating(
-									metav1.ConditionTrue,
-									updatestatus.ClusterVersionProgressing,
-									"ClusterVersion has Progressing=True(Reason=ProgressingTrue) | Message='Cluster is progressing'",
-									now,
-								),
-							},
+						},
+						Completion:           0,
+						StartedAt:            minutesAgo[90],
+						EstimatedCompletedAt: &minutesAgo[30],
+						Conditions: []metav1.Condition{
+							newClusterVersionStatusInsightUpdating(
+								metav1.ConditionTrue,
+								updatestatus.ClusterVersionProgressing,
+								"ClusterVersion has Progressing=True(Reason=ProgressingTrue) | Message='Cluster is progressing'",
+								now,
+							),
 						},
 					},
 				},
@@ -133,36 +129,30 @@ func Test_sync_with_cv(t *testing.T) {
 			name:          "Cluster after installation",
 			cvProgressing: &progressingFalse,
 			cvHistory:     []configv1.UpdateHistory{completed418},
-			expectedMsgs: map[string]updatestatus.ControlPlaneInsight{
-				"cv-version": {
-					UID:        "cv-version",
-					AcquiredAt: now,
-					Insight: updatestatus.ControlPlaneInsightUnion{
-						Type: updatestatus.ClusterVersionStatusInsightType,
-						ClusterVersionStatusInsight: &updatestatus.ClusterVersionStatusInsight{
-							Resource:   cvRef,
-							Assessment: updatestatus.ControlPlaneAssessmentCompleted,
-							Versions: updatestatus.ControlPlaneUpdateVersions{
-								Previous: updatestatus.Version{
-									Version:  "<none>",
-									Metadata: []updatestatus.VersionMetadata{{Key: updatestatus.InstallationMetadata}},
-								},
-								Target: updatestatus.Version{
-									Version: "4.18.0",
-								},
+			expectedMsgs: []informerMsg{
+				{
+					informer: controlPlaneInformerName,
+					uid:      "version",
+					cvInsight: &updatestatus.ClusterVersionProgressInsightStatus{
+						Name:       "version",
+						Assessment: updatestatus.ClusterVersionAssessmentCompleted,
+						Versions: updatestatus.ControlPlaneUpdateVersions{
+							Target: updatestatus.Version{
+								Version:  "4.18.0",
+								Metadata: []updatestatus.VersionMetadata{{Key: updatestatus.InstallationMetadata}},
 							},
-							Completion:           100,
-							StartedAt:            minutesAgo[90],
-							CompletedAt:          &minutesAgo[60],
-							EstimatedCompletedAt: &minutesAgo[30],
-							Conditions: []metav1.Condition{
-								newClusterVersionStatusInsightUpdating(
-									metav1.ConditionFalse,
-									updatestatus.ClusterVersionNotProgressing,
-									"ClusterVersion has Progressing=False(Reason=ProgressingFalse) | Message='Cluster is on version 4.X.0'",
-									now,
-								),
-							},
+						},
+						Completion:           100,
+						StartedAt:            minutesAgo[90],
+						CompletedAt:          &minutesAgo[60],
+						EstimatedCompletedAt: &minutesAgo[30],
+						Conditions: []metav1.Condition{
+							newClusterVersionStatusInsightUpdating(
+								metav1.ConditionFalse,
+								updatestatus.ClusterVersionNotProgressing,
+								"ClusterVersion has Progressing=False(Reason=ProgressingFalse) | Message='Cluster is on version 4.X.0'",
+								now,
+							),
 						},
 					},
 				},
@@ -172,30 +162,27 @@ func Test_sync_with_cv(t *testing.T) {
 			name:          "Cluster during a standard update",
 			cvProgressing: &progressingTrue,
 			cvHistory:     []configv1.UpdateHistory{inProgress419, completed418},
-			expectedMsgs: map[string]updatestatus.ControlPlaneInsight{
-				"cv-version": {
-					UID:        "cv-version",
-					AcquiredAt: now,
-					Insight: updatestatus.ControlPlaneInsightUnion{
-						Type: updatestatus.ClusterVersionStatusInsightType,
-						ClusterVersionStatusInsight: &updatestatus.ClusterVersionStatusInsight{
-							Resource:   cvRef,
-							Assessment: updatestatus.ControlPlaneAssessmentProgressing,
-							Versions: updatestatus.ControlPlaneUpdateVersions{
-								Target:   updatestatus.Version{Version: "4.19.0"},
-								Previous: updatestatus.Version{Version: "4.18.0"},
-							},
-							Completion:           0,
-							StartedAt:            minutesAgo[60],
-							EstimatedCompletedAt: &now,
-							Conditions: []metav1.Condition{
-								newClusterVersionStatusInsightUpdating(
-									metav1.ConditionTrue,
-									updatestatus.ClusterVersionProgressing,
-									"ClusterVersion has Progressing=True(Reason=ProgressingTrue) | Message='Cluster is progressing'",
-									now,
-								),
-							},
+			expectedMsgs: []informerMsg{
+				{
+					informer: controlPlaneInformerName,
+					uid:      "version",
+					cvInsight: &updatestatus.ClusterVersionProgressInsightStatus{
+						Name:       "version",
+						Assessment: updatestatus.ClusterVersionAssessmentProgressing,
+						Versions: updatestatus.ControlPlaneUpdateVersions{
+							Previous: &updatestatus.Version{Version: "4.18.0"},
+							Target:   updatestatus.Version{Version: "4.19.0"},
+						},
+						Completion:           0,
+						StartedAt:            minutesAgo[60],
+						EstimatedCompletedAt: &now,
+						Conditions: []metav1.Condition{
+							newClusterVersionStatusInsightUpdating(
+								metav1.ConditionTrue,
+								updatestatus.ClusterVersionProgressing,
+								"ClusterVersion has Progressing=True(Reason=ProgressingTrue) | Message='Cluster is progressing'",
+								now,
+							),
 						},
 					},
 				},
@@ -208,55 +195,49 @@ func Test_sync_with_cv(t *testing.T) {
 			cvAnnotations: map[string]string{
 				uscForceHealthInsightAnnotation: "value-does-not-matter",
 			},
-			expectedMsgs: map[string]updatestatus.ControlPlaneInsight{
-				"0kmuaUQRUJDOAIAF1KWTmg": {
-					UID:        "0kmuaUQRUJDOAIAF1KWTmg",
-					AcquiredAt: now,
-					Insight: updatestatus.ControlPlaneInsightUnion{
-						Type: updatestatus.HealthInsightType,
-						HealthInsight: &updatestatus.HealthInsight{
-							StartedAt: now,
-							Scope: updatestatus.InsightScope{
-								Type: updatestatus.ControlPlaneScope,
-								Resources: []updatestatus.ResourceRef{
-									cvRef,
-								},
+			expectedMsgs: []informerMsg{
+				{
+					informer: controlPlaneInformerName,
+					uid:      "0kmuaUQRUJDOAIAF1KWTmg",
+					healthInsight: &updatestatus.HealthInsightStatus{
+						StartedAt: now,
+						Scope: updatestatus.InsightScope{
+							Type: updatestatus.ControlPlaneScope,
+							Resources: []updatestatus.ResourceRef{
+								cvRef,
 							},
-							Impact: updatestatus.InsightImpact{
-								Level:       updatestatus.InfoImpactLevel,
-								Type:        updatestatus.NoneImpactType,
-								Summary:     "Forced health insight for ClusterVersion version",
-								Description: "The resource has a \"usc.openshift.io/force-health-insight\" annotation which forces USC to generate this health insight for testing purposes.",
-							},
-							Remediation: updatestatus.InsightRemediation{
-								Reference: "https://issues.redhat.com/browse/OTA-1418",
-							},
+						},
+						Impact: updatestatus.InsightImpact{
+							Level:       updatestatus.InfoImpactLevel,
+							Type:        updatestatus.NoneImpactType,
+							Summary:     "Forced health insight for ClusterVersion version",
+							Description: "The resource has a \"usc.openshift.io/force-health-insight\" annotation which forces USC to generate this health insight for testing purposes.",
+						},
+						Remediation: updatestatus.InsightRemediation{
+							Reference: "https://issues.redhat.com/browse/OTA-1418",
 						},
 					},
 				},
-				"cv-version": {
-					UID:        "cv-version",
-					AcquiredAt: now,
-					Insight: updatestatus.ControlPlaneInsightUnion{
-						Type: updatestatus.ClusterVersionStatusInsightType,
-						ClusterVersionStatusInsight: &updatestatus.ClusterVersionStatusInsight{
-							Resource:   cvRef,
-							Assessment: updatestatus.ControlPlaneAssessmentProgressing,
-							Versions: updatestatus.ControlPlaneUpdateVersions{
-								Target:   updatestatus.Version{Version: "4.19.0"},
-								Previous: updatestatus.Version{Version: "4.18.0"},
-							},
-							Completion:           0,
-							StartedAt:            minutesAgo[60],
-							EstimatedCompletedAt: &now,
-							Conditions: []metav1.Condition{
-								newClusterVersionStatusInsightUpdating(
-									metav1.ConditionTrue,
-									updatestatus.ClusterVersionProgressing,
-									"ClusterVersion has Progressing=True(Reason=ProgressingTrue) | Message='Cluster is progressing'",
-									now,
-								),
-							},
+				{
+					informer: controlPlaneInformerName,
+					uid:      "version",
+					cvInsight: &updatestatus.ClusterVersionProgressInsightStatus{
+						Name:       "version",
+						Assessment: updatestatus.ClusterVersionAssessmentProgressing,
+						Versions: updatestatus.ControlPlaneUpdateVersions{
+							Previous: &updatestatus.Version{Version: "4.18.0"},
+							Target:   updatestatus.Version{Version: "4.19.0"},
+						},
+						Completion:           0,
+						StartedAt:            minutesAgo[60],
+						EstimatedCompletedAt: &now,
+						Conditions: []metav1.Condition{
+							newClusterVersionStatusInsightUpdating(
+								metav1.ConditionTrue,
+								updatestatus.ClusterVersionProgressing,
+								"ClusterVersion has Progressing=True(Reason=ProgressingTrue) | Message='Cluster is progressing'",
+								now,
+							),
 						},
 					},
 				},
@@ -292,19 +273,10 @@ func Test_sync_with_cv(t *testing.T) {
 				t.Fatalf("unexpected error from sync(): %v", err)
 			}
 
-			var expectedMsgs []informerMsg
-			for uid, insight := range tc.expectedMsgs {
-				expectedMsgs = append(expectedMsgs, informerMsg{
-					informer:  controlPlaneInformerName,
-					uid:       uid,
-					cpInsight: insight.DeepCopy(),
-				})
-			}
-
 			ignoreOrder := cmpopts.SortSlices(func(a, b informerMsg) bool {
 				return a.uid < b.uid
 			})
-			if diff := cmp.Diff(expectedMsgs, actualMsgs, ignoreOrder, cmp.AllowUnexported(informerMsg{})); diff != "" {
+			if diff := cmp.Diff(tc.expectedMsgs, actualMsgs, ignoreOrder, cmp.AllowUnexported(informerMsg{})); diff != "" {
 				t.Errorf("Sync messages differ from expected:\n%s", diff)
 			}
 			for _, msg := range actualMsgs {
@@ -528,24 +500,16 @@ func Test_sync_with_co(t *testing.T) {
 	testCases := []struct {
 		name string
 
-		expectedMsgs map[string]updatestatus.ControlPlaneInsight
+		expectedMsgs map[string]updatestatus.ClusterOperatorProgressInsightStatus
 	}{
 		{
 			name: "Cluster during installation",
-			expectedMsgs: map[string]updatestatus.ControlPlaneInsight{
-				"co-some-co": {
-					UID:        "co-some-co",
-					AcquiredAt: now,
-					Insight: updatestatus.ControlPlaneInsightUnion{
-						Type: updatestatus.ClusterOperatorStatusInsightType,
-						ClusterOperatorStatusInsight: &updatestatus.ClusterOperatorStatusInsight{
-							Name:     "some-co",
-							Resource: updatestatus.ResourceRef{Resource: "clusteroperators", Group: "config.openshift.io", Name: "some-co"},
-							Conditions: []metav1.Condition{
-								{Type: "Updating", Status: "True", LastTransitionTime: now, Reason: "Progressing"},
-								{Type: "Healthy", Status: "True", LastTransitionTime: now, Reason: "AsExpected"},
-							},
-						},
+			expectedMsgs: map[string]updatestatus.ClusterOperatorProgressInsightStatus{
+				"some-co": {
+					Name: "some-co",
+					Conditions: []metav1.Condition{
+						{Type: "Updating", Status: "True", LastTransitionTime: now, Reason: "Progressing"},
+						{Type: "Healthy", Status: "True", LastTransitionTime: now, Reason: "AsExpected"},
 					},
 				},
 			},
@@ -591,7 +555,7 @@ func Test_sync_with_co(t *testing.T) {
 				expectedMsgs = append(expectedMsgs, informerMsg{
 					informer:  controlPlaneInformerName,
 					uid:       uid,
-					cpInsight: insight.DeepCopy(),
+					coInsight: insight.DeepCopy(),
 				})
 			}
 
@@ -676,7 +640,7 @@ func Test_assessClusterOperator(t *testing.T) {
 		targetVersion string
 		appsClient    appsv1client.AppsV1Interface
 
-		expected    *updatestatus.ClusterOperatorStatusInsight
+		expected    *updatestatus.ClusterOperatorProgressInsightStatus
 		expectedErr error
 	}{
 		{
@@ -684,9 +648,8 @@ func Test_assessClusterOperator(t *testing.T) {
 			co: &configv1.ClusterOperator{
 				ObjectMeta: metav1.ObjectMeta{Name: "some-co"},
 			},
-			expected: &updatestatus.ClusterOperatorStatusInsight{
-				Name:     "some-co",
-				Resource: updatestatus.ResourceRef{Group: "config.openshift.io", Resource: "clusteroperators", Name: "some-co"},
+			expected: &updatestatus.ClusterOperatorProgressInsightStatus{
+				Name: "some-co",
 				Conditions: []metav1.Condition{
 					{
 						Type:               "Updating",
@@ -725,9 +688,8 @@ func Test_assessClusterOperator(t *testing.T) {
 				},
 			},
 			targetVersion: "x",
-			expected: &updatestatus.ClusterOperatorStatusInsight{
-				Name:     "some-co",
-				Resource: updatestatus.ResourceRef{Group: "config.openshift.io", Resource: "clusteroperators", Name: "some-co"},
+			expected: &updatestatus.ClusterOperatorProgressInsightStatus{
+				Name: "some-co",
 				Conditions: []metav1.Condition{
 					{
 						Type:               "Updating",
@@ -765,9 +727,8 @@ func Test_assessClusterOperator(t *testing.T) {
 				},
 			},
 			targetVersion: "y",
-			expected: &updatestatus.ClusterOperatorStatusInsight{
-				Name:     "some-co",
-				Resource: updatestatus.ResourceRef{Group: "config.openshift.io", Resource: "clusteroperators", Name: "some-co"},
+			expected: &updatestatus.ClusterOperatorProgressInsightStatus{
+				Name: "some-co",
 				Conditions: []metav1.Condition{
 					{
 						Type:               "Updating",
@@ -806,9 +767,8 @@ func Test_assessClusterOperator(t *testing.T) {
 			},
 			targetVersion: "y",
 			appsClient:    fakekubeclient.NewClientset(mcoDeployment.DeepCopy()).AppsV1(),
-			expected: &updatestatus.ClusterOperatorStatusInsight{
-				Name:     "machine-config",
-				Resource: updatestatus.ResourceRef{Group: "config.openshift.io", Resource: "clusteroperators", Name: "machine-config"},
+			expected: &updatestatus.ClusterOperatorProgressInsightStatus{
+				Name: "machine-config",
 				Conditions: []metav1.Condition{
 					{
 						Type:               "Updating",
@@ -848,9 +808,8 @@ func Test_assessClusterOperator(t *testing.T) {
 			},
 			targetVersion: "x",
 			appsClient:    fakekubeclient.NewClientset(mcoDeployment.DeepCopy()).AppsV1(),
-			expected: &updatestatus.ClusterOperatorStatusInsight{
-				Name:     "machine-config",
-				Resource: updatestatus.ResourceRef{Group: "config.openshift.io", Resource: "clusteroperators", Name: "machine-config"},
+			expected: &updatestatus.ClusterOperatorProgressInsightStatus{
+				Name: "machine-config",
 				Conditions: []metav1.Condition{
 					{
 						Type:               "Updating",
@@ -890,9 +849,8 @@ func Test_assessClusterOperator(t *testing.T) {
 			},
 			targetVersion: "x",
 			appsClient:    fakekubeclient.NewClientset(mcoDeployment.DeepCopy()).AppsV1(),
-			expected: &updatestatus.ClusterOperatorStatusInsight{
-				Name:     "machine-config",
-				Resource: updatestatus.ResourceRef{Group: "config.openshift.io", Resource: "clusteroperators", Name: "machine-config"},
+			expected: &updatestatus.ClusterOperatorProgressInsightStatus{
+				Name: "machine-config",
 				Conditions: []metav1.Condition{
 					{
 						Type:               "Updating",
@@ -939,9 +897,8 @@ func Test_assessClusterOperator(t *testing.T) {
 				},
 			},
 			targetVersion: "y",
-			expected: &updatestatus.ClusterOperatorStatusInsight{
-				Name:     "some-co",
-				Resource: updatestatus.ResourceRef{Group: "config.openshift.io", Resource: "clusteroperators", Name: "some-co"},
+			expected: &updatestatus.ClusterOperatorProgressInsightStatus{
+				Name: "some-co",
 				Conditions: []metav1.Condition{
 					{
 						Type:               "Updating",
@@ -986,9 +943,8 @@ func Test_assessClusterOperator(t *testing.T) {
 				},
 			},
 			targetVersion: "y",
-			expected: &updatestatus.ClusterOperatorStatusInsight{
-				Name:     "some-co",
-				Resource: updatestatus.ResourceRef{Group: "config.openshift.io", Resource: "clusteroperators", Name: "some-co"},
+			expected: &updatestatus.ClusterOperatorProgressInsightStatus{
+				Name: "some-co",
 				Conditions: []metav1.Condition{
 					{
 						Type:               "Updating",
@@ -1034,18 +990,13 @@ func Test_assessClusterVersion_cvStatusInsight(t *testing.T) {
 		minutesAgo[i] = metav1.NewTime(now.Add(-time.Duration(i) * time.Minute))
 	}
 
-	cvReference := updatestatus.ResourceRef{
-		Resource: "clusterversions",
-		Group:    "config.openshift.io",
-		Name:     "version",
-	}
 	testCases := []struct {
 		name string
 
 		cvHistory     []configv1.UpdateHistory
 		cvProgressing configv1.ClusterOperatorStatusCondition
 
-		expected *updatestatus.ClusterVersionStatusInsight
+		expected *updatestatus.ClusterVersionProgressInsightStatus
 	}{
 		{
 			name: "ClusterVersion during installation",
@@ -1064,16 +1015,13 @@ func Test_assessClusterVersion_cvStatusInsight(t *testing.T) {
 				Reason:             "WhateverCVOHasHereWhenInstalling",
 				Message:            "Whatever CVO has as a message while installing",
 			},
-			expected: &updatestatus.ClusterVersionStatusInsight{
-				Resource:   cvReference,
-				Assessment: updatestatus.ControlPlaneAssessmentProgressing,
+			expected: &updatestatus.ClusterVersionProgressInsightStatus{
+				Name:       "version",
+				Assessment: updatestatus.ClusterVersionAssessmentProgressing,
 				Versions: updatestatus.ControlPlaneUpdateVersions{
-					Previous: updatestatus.Version{
-						Metadata: []updatestatus.VersionMetadata{{Key: updatestatus.InstallationMetadata}},
-						Version:  "<none>",
-					},
 					Target: updatestatus.Version{
-						Version: "4.18.0",
+						Version:  "4.18.0",
+						Metadata: []updatestatus.VersionMetadata{{Key: updatestatus.InstallationMetadata}},
 					},
 				},
 				StartedAt:            minutesAgo[30],
@@ -1106,16 +1054,13 @@ func Test_assessClusterVersion_cvStatusInsight(t *testing.T) {
 				// CVO does not set up a Reason when Progressing=False
 				Message: "Cluster version is 4.18.0",
 			},
-			expected: &updatestatus.ClusterVersionStatusInsight{
-				Resource:   cvReference,
-				Assessment: updatestatus.ControlPlaneAssessmentCompleted,
+			expected: &updatestatus.ClusterVersionProgressInsightStatus{
+				Name:       "version",
+				Assessment: updatestatus.ClusterVersionAssessmentCompleted,
 				Versions: updatestatus.ControlPlaneUpdateVersions{
-					Previous: updatestatus.Version{
-						Version:  "<none>",
-						Metadata: []updatestatus.VersionMetadata{{Key: updatestatus.InstallationMetadata}},
-					},
 					Target: updatestatus.Version{
-						Version: "4.18.0",
+						Version:  "4.18.0",
+						Metadata: []updatestatus.VersionMetadata{{Key: updatestatus.InstallationMetadata}},
 					},
 				},
 				Completion:           100,
@@ -1156,12 +1101,12 @@ func Test_assessClusterVersion_cvStatusInsight(t *testing.T) {
 				Reason:             "WhateverCVOHasHereWhenUpdating",
 				Message:            "Whatever CVO has as a message while updating",
 			},
-			expected: &updatestatus.ClusterVersionStatusInsight{
-				Resource:   cvReference,
-				Assessment: updatestatus.ControlPlaneAssessmentProgressing,
+			expected: &updatestatus.ClusterVersionProgressInsightStatus{
+				Name:       "version",
+				Assessment: updatestatus.ClusterVersionAssessmentProgressing,
 				Versions: updatestatus.ControlPlaneUpdateVersions{
+					Previous: &updatestatus.Version{Version: "4.18.0"},
 					Target:   updatestatus.Version{Version: "4.19.0"},
-					Previous: updatestatus.Version{Version: "4.18.0"},
 				},
 				StartedAt:            minutesAgo[20],
 				EstimatedCompletedAt: ptr.To[metav1.Time](metav1.NewTime(now.Add(40 * time.Minute))),
@@ -1200,13 +1145,13 @@ func Test_assessClusterVersion_cvStatusInsight(t *testing.T) {
 				// CVO does not set up a Reason when Progressing=False
 				Message: "Cluster version is 4.19.0",
 			},
-			expected: &updatestatus.ClusterVersionStatusInsight{
-				Resource:   cvReference,
-				Assessment: updatestatus.ControlPlaneAssessmentCompleted,
+			expected: &updatestatus.ClusterVersionProgressInsightStatus{
+				Name:       "version",
+				Assessment: updatestatus.ClusterVersionAssessmentCompleted,
 				Completion: 100,
 				Versions: updatestatus.ControlPlaneUpdateVersions{
+					Previous: &updatestatus.Version{Version: "4.18.0"},
 					Target:   updatestatus.Version{Version: "4.19.0"},
-					Previous: updatestatus.Version{Version: "4.18.0"},
 				},
 				StartedAt:            minutesAgo[20],
 				CompletedAt:          &minutesAgo[10],
@@ -1252,15 +1197,15 @@ func Test_assessClusterVersion_cvStatusInsight(t *testing.T) {
 				Reason:             "WhateverCVOHasHereWhenUpdating",
 				Message:            "Whatever CVO has as a message while updating",
 			},
-			expected: &updatestatus.ClusterVersionStatusInsight{
-				Resource:   cvReference,
-				Assessment: updatestatus.ControlPlaneAssessmentProgressing,
+			expected: &updatestatus.ClusterVersionProgressInsightStatus{
+				Name:       "version",
+				Assessment: updatestatus.ClusterVersionAssessmentProgressing,
 				Versions: updatestatus.ControlPlaneUpdateVersions{
-					Target: updatestatus.Version{Version: "4.19.1"},
-					Previous: updatestatus.Version{
+					Previous: &updatestatus.Version{
 						Version:  "4.19.0",
 						Metadata: []updatestatus.VersionMetadata{{Key: updatestatus.PartialMetadata}},
 					},
+					Target: updatestatus.Version{Version: "4.19.1"},
 				},
 				StartedAt:            minutesAgo[20],
 				EstimatedCompletedAt: ptr.To[metav1.Time](metav1.NewTime(now.Add(40 * time.Minute))),
@@ -1306,16 +1251,16 @@ func Test_assessClusterVersion_cvStatusInsight(t *testing.T) {
 				// CVO does not set up a Reason when Progressing=False
 				Message: "Cluster version is 4.19.1",
 			},
-			expected: &updatestatus.ClusterVersionStatusInsight{
-				Resource:   cvReference,
-				Assessment: updatestatus.ControlPlaneAssessmentCompleted,
+			expected: &updatestatus.ClusterVersionProgressInsightStatus{
+				Name:       "version",
+				Assessment: updatestatus.ClusterVersionAssessmentCompleted,
 				Completion: 100,
 				Versions: updatestatus.ControlPlaneUpdateVersions{
-					Target: updatestatus.Version{Version: "4.19.1"},
-					Previous: updatestatus.Version{
+					Previous: &updatestatus.Version{
 						Version:  "4.19.0",
 						Metadata: []updatestatus.VersionMetadata{{Key: updatestatus.PartialMetadata}},
 					},
+					Target: updatestatus.Version{Version: "4.19.1"},
 				},
 				StartedAt:            minutesAgo[20],
 				CompletedAt:          &minutesAgo[10],
@@ -1345,7 +1290,7 @@ func Test_assessClusterVersion_cvStatusInsight(t *testing.T) {
 				t.Errorf("CV Status Insight differs from expected:\n%s", diff)
 			}
 
-			if diff := cmp.Diff([]*updatestatus.HealthInsight(nil), healthInsights); diff != "" {
+			if diff := cmp.Diff([]*updatestatus.HealthInsightStatus(nil), healthInsights); diff != "" {
 				t.Errorf("Unexpected health insights:\n%s", diff)
 			}
 		})
@@ -1370,7 +1315,7 @@ func Test_assessClusterVersion_testingHealthInsight(t *testing.T) {
 
 		cvAnnotations map[string]string
 
-		expected []*updatestatus.HealthInsight
+		expected []*updatestatus.HealthInsightStatus
 	}{
 		{
 			name:          "no annotations -> no insight",
@@ -1389,7 +1334,7 @@ func Test_assessClusterVersion_testingHealthInsight(t *testing.T) {
 			cvAnnotations: map[string]string{
 				"usc.openshift.io/force-health-insight": "value-does-not-matter",
 			},
-			expected: []*updatestatus.HealthInsight{
+			expected: []*updatestatus.HealthInsightStatus{
 				{
 					StartedAt: now,
 					Scope: updatestatus.InsightScope{
@@ -1477,7 +1422,7 @@ func Test_isControlPlaneUpdating(t *testing.T) {
 			lastHistoryItem: &partialUpdate,
 			expectedCondition: metav1.Condition{
 				Status:  metav1.ConditionTrue,
-				Reason:  "ClusterVersionProgressing",
+				Reason:  "Progressing",
 				Message: "ClusterVersion has Progressing=True(Reason=WhateverCVOHasHereWhenUpdating) | Message='Cluster is updating to 4.19.0'",
 			},
 			expectedStarted:   partialUpdate.StartedTime,
@@ -1489,7 +1434,7 @@ func Test_isControlPlaneUpdating(t *testing.T) {
 			lastHistoryItem: &completedUpdate,
 			expectedCondition: metav1.Condition{
 				Status:  metav1.ConditionFalse,
-				Reason:  "ClusterVersionNotProgressing",
+				Reason:  "NotProgressing",
 				Message: "ClusterVersion has Progressing=False(Reason=) | Message='Cluster version is 4.19.0'",
 			},
 			expectedStarted:   completedUpdate.StartedTime,
@@ -1600,7 +1545,7 @@ func Test_isControlPlaneUpdating(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.expectedCondition.Type = string(updatestatus.ClusterVersionStatusInsightUpdating)
+			tc.expectedCondition.Type = string(updatestatus.ClusterVersionProgressInsightUpdating)
 
 			actualStatus, actualStarted, actualCompleted := isControlPlaneUpdating(tc.cvProgressing, tc.lastHistoryItem)
 			if diff := cmp.Diff(tc.expectedCondition, actualStatus); diff != "" {
@@ -1633,7 +1578,7 @@ func Test_cvProgressingToUpdating(t *testing.T) {
 				Message: "MessageTrue",
 			},
 			expectedStatus:  metav1.ConditionTrue,
-			expectedReason:  "ClusterVersionProgressing",
+			expectedReason:  "Progressing",
 			expectedMessage: "ClusterVersion has Progressing=True(Reason=ReasonTrue) | Message='MessageTrue'",
 		},
 		{
@@ -1644,7 +1589,7 @@ func Test_cvProgressingToUpdating(t *testing.T) {
 				Message: "MessageFalse",
 			},
 			expectedStatus:  metav1.ConditionFalse,
-			expectedReason:  "ClusterVersionNotProgressing",
+			expectedReason:  "NotProgressing",
 			expectedMessage: "ClusterVersion has Progressing=False(Reason=ReasonFalse) | Message='MessageFalse'",
 		},
 		{
@@ -1706,12 +1651,9 @@ func Test_versionsFromHistory(t *testing.T) {
 				},
 			},
 			expected: updatestatus.ControlPlaneUpdateVersions{
-				Previous: updatestatus.Version{
-					Version:  "<none>",
-					Metadata: []updatestatus.VersionMetadata{{Key: updatestatus.InstallationMetadata}},
-				},
 				Target: updatestatus.Version{
-					Version: "4.18.0",
+					Version:  "4.18.0",
+					Metadata: []updatestatus.VersionMetadata{{Key: updatestatus.InstallationMetadata}},
 				},
 			},
 		},
@@ -1733,8 +1675,8 @@ func Test_versionsFromHistory(t *testing.T) {
 				},
 			},
 			expected: updatestatus.ControlPlaneUpdateVersions{
+				Previous: &updatestatus.Version{Version: "4.18.0"},
 				Target:   updatestatus.Version{Version: "4.19.0"},
-				Previous: updatestatus.Version{Version: "4.18.0"},
 			},
 		},
 		{
@@ -1756,7 +1698,7 @@ func Test_versionsFromHistory(t *testing.T) {
 			},
 			expected: updatestatus.ControlPlaneUpdateVersions{
 				Target: updatestatus.Version{Version: "4.19.1"},
-				Previous: updatestatus.Version{
+				Previous: &updatestatus.Version{
 					Version:  "4.19.0",
 					Metadata: []updatestatus.VersionMetadata{{Key: updatestatus.PartialMetadata}},
 				},

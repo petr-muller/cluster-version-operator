@@ -14,8 +14,6 @@ import (
 	machineconfigv1client "github.com/openshift/client-go/machineconfiguration/clientset/versioned"
 	machineconfiginformers "github.com/openshift/client-go/machineconfiguration/informers/externalversions"
 	updatev1alpha1client "github.com/openshift/client-go/update/clientset/versioned"
-	updatev1alpha1informers "github.com/openshift/client-go/update/informers/externalversions"
-
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 )
 
@@ -47,18 +45,16 @@ func Run(ctx context.Context, cc *controllercmd.ControllerContext) error {
 	}
 
 	configInformers := configinformers.NewSharedInformerFactory(configClient, 10*time.Minute)
-	updateInformers := updatev1alpha1informers.NewSharedInformerFactory(updateClient, 10*time.Minute)
 	coreInformers := informers.NewSharedInformerFactoryWithOptions(coreClient, 10*time.Minute)
 	machineConfigInformers := machineconfiginformers.NewSharedInformerFactory(machineConfigClient, 10*time.Minute)
 
-	updateStatusController, sendInsight := newUpdateStatusController(updateClient, updateInformers, cc.EventRecorder)
+	updateStatusController, sendInsight := newUpdateStatusController(updateClient, cc.EventRecorder)
 	controlPlaneInformerController := newControlPlaneInformerController(appsClient, configInformers, cc.EventRecorder, sendInsight)
 	nodeInformerController := newNodeInformerController(configClient, coreInformers, machineConfigInformers, cc.EventRecorder, sendInsight)
 
 	// start the informers, but we do not need to wait for them to sync because each controller waits
 	// for synced informers it uses in its Run() method
 	configInformers.Start(ctx.Done())
-	updateInformers.Start(ctx.Done())
 	coreInformers.Start(ctx.Done())
 	machineConfigInformers.Start(ctx.Done())
 

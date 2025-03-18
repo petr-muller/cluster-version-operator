@@ -3,13 +3,12 @@ package updatestatus
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -17,7 +16,6 @@ import (
 	updatestatus "github.com/openshift/api/update/v1alpha1"
 	updateclient "github.com/openshift/client-go/update/clientset/versioned"
 	updatev1alpha1 "github.com/openshift/client-go/update/clientset/versioned/typed/update/v1alpha1"
-	updateinformers "github.com/openshift/client-go/update/informers/externalversions"
 )
 
 const (
@@ -84,24 +82,54 @@ type informerMsg struct {
 
 	uid string
 
-	cpInsight *updatestatus.ControlPlaneInsight
-	wpInsight *updatestatus.WorkerPoolInsight
+	cvInsight     *updatestatus.ClusterVersionProgressInsightStatus
+	coInsight     *updatestatus.ClusterOperatorProgressInsightStatus
+	mcpInsight    *updatestatus.MachineConfigPoolProgressInsightStatus
+	nodeInsight   *updatestatus.NodeProgressInsightStatus
+	healthInsight *updatestatus.HealthInsightStatus
 }
 
-func makeControlPlaneInsightMsg(insight updatestatus.ControlPlaneInsight, informer string) (informerMsg, error) {
+func makeClusterVersionProgressInsightMsg(insight *updatestatus.ClusterVersionProgressInsightStatus, uid, informer string) (informerMsg, error) {
 	msg := informerMsg{
 		informer:  informer,
-		uid:       insight.UID,
-		cpInsight: insight.DeepCopy(),
+		uid:       uid,
+		cvInsight: insight.DeepCopy(),
 	}
 	return msg, msg.validate()
 }
 
-func makeWorkerPoolsInsightMsg(insight updatestatus.WorkerPoolInsight, informer string) (informerMsg, error) {
+func makeClusterOperatorProgressInsightMsg(insight *updatestatus.ClusterOperatorProgressInsightStatus, uid, informer string) (informerMsg, error) {
 	msg := informerMsg{
 		informer:  informer,
-		uid:       insight.UID,
-		wpInsight: insight.DeepCopy(),
+		uid:       uid,
+		coInsight: insight.DeepCopy(),
+	}
+	return msg, msg.validate()
+}
+
+func makeMachineConfigPoolProgressInsightMsg(insight *updatestatus.MachineConfigPoolProgressInsightStatus, uid, informer string) (informerMsg, error) {
+	msg := informerMsg{
+		informer:   informer,
+		uid:        uid,
+		mcpInsight: insight.DeepCopy(),
+	}
+	return msg, msg.validate()
+}
+
+func makeNodeProgressInsightMsg(insight *updatestatus.NodeProgressInsightStatus, uid, informer string) (informerMsg, error) {
+	msg := informerMsg{
+		informer:    informer,
+		uid:         uid,
+		nodeInsight: insight.DeepCopy(),
+	}
+	return msg, msg.validate()
+}
+
+func makeHealthInsightMsg(insight *updatestatus.HealthInsightStatus, uid, informer string) (informerMsg, error) {
+	msg := informerMsg{
+		informer:      informer,
+		uid:           uid,
+		healthInsight: insight.DeepCopy(),
 	}
 	return msg, msg.validate()
 }
@@ -126,7 +154,11 @@ type sendInsightFn func(insight informerMsg)
 // NOTE: The communication mechanism was added in the initial scaffolding PR and does not aspire to be the final
 // and 100% efficient solution. Feel free to improve or even replace it if turns out to be unsuitable in practice.
 type updateStatusController struct {
-	updateStatuses updatev1alpha1.UpdateStatusInterface
+	cvInsights     updatev1alpha1.ClusterVersionProgressInsightInterface
+	coInsights     updatev1alpha1.ClusterOperatorProgressInsightInterface
+	mcpInsights    updatev1alpha1.MachineConfigPoolProgressInsightInterface
+	nodeInsights   updatev1alpha1.NodeProgressInsightInterface
+	healthInsights updatev1alpha1.HealthInsightInterface
 
 	state updateStatusApi
 
@@ -137,24 +169,25 @@ type updateStatusController struct {
 // the other controllers should use to send insights to this controller.
 func newUpdateStatusController(
 	updateClient updateclient.Interface,
-	updateInformers updateinformers.SharedInformerFactory,
 	recorder events.Recorder,
 ) (factory.Controller, sendInsightFn) {
 	uscRecorder := recorder.WithComponentSuffix("update-status-controller")
 
 	c := &updateStatusController{
-		updateStatuses: updateClient.UpdateV1alpha1().UpdateStatuses(),
-		recorder:       uscRecorder,
-		state:          updateStatusApi{now: time.Now},
+		cvInsights:     updateClient.UpdateV1alpha1().ClusterVersionProgressInsights(),
+		coInsights:     updateClient.UpdateV1alpha1().ClusterOperatorProgressInsights(),
+		mcpInsights:    updateClient.UpdateV1alpha1().MachineConfigPoolProgressInsights(),
+		nodeInsights:   updateClient.UpdateV1alpha1().NodeProgressInsights(),
+		healthInsights: updateClient.UpdateV1alpha1().HealthInsights(),
+
+		recorder: uscRecorder,
+		state:    updateStatusApi{now: time.Now},
 	}
 
 	startInsightReceiver, sendInsight := c.setupInsightReceiver()
 
-	usInformer := updateInformers.Update().V1alpha1().UpdateStatuses().Informer()
 	controller := factory.New().
-		// call sync every 5 minutes or on CM events in the openshift-cluster-version namespace
-		WithSync(c.sync).ResyncEvery(5*time.Minute).
-		WithInformersQueueKeysFunc(queueKey, usInformer).
+		WithSync(c.sync).ResyncEvery(time.Minute).
 		WithPostStartHooks(startInsightReceiver).
 		ToController("UpdateStatusController", c.recorder)
 
@@ -166,11 +199,21 @@ func (m informerMsg) validate() error {
 	case m.informer == "":
 		return fmt.Errorf("empty informer")
 	case m.uid == "":
-		return fmt.Errorf("empty uid")
-	case m.cpInsight == nil && m.wpInsight == nil:
+		return fmt.Errorf("empty UID")
+	case m.cvInsight == nil && m.coInsight == nil && m.mcpInsight == nil && m.nodeInsight == nil && m.healthInsight == nil:
 		return fmt.Errorf("empty insight")
-	case m.cpInsight != nil && m.wpInsight != nil:
-		return fmt.Errorf("both control plane and worker pool insights set")
+
+	// Stupid but works for now
+	case m.cvInsight != nil && (m.coInsight != nil || m.mcpInsight != nil || m.nodeInsight != nil || m.healthInsight != nil):
+		return fmt.Errorf("multiple insights in a single message")
+	case m.coInsight != nil && (m.cvInsight != nil || m.mcpInsight != nil || m.nodeInsight != nil || m.healthInsight != nil):
+		return fmt.Errorf("multiple insights in a single message")
+	case m.mcpInsight != nil && (m.cvInsight != nil || m.coInsight != nil || m.nodeInsight != nil || m.healthInsight != nil):
+		return fmt.Errorf("multiple insights in a single message")
+	case m.nodeInsight != nil && (m.cvInsight != nil || m.coInsight != nil || m.mcpInsight != nil || m.healthInsight != nil):
+		return fmt.Errorf("multiple insights in a single message")
+	case m.healthInsight != nil && (m.cvInsight != nil || m.coInsight != nil || m.mcpInsight != nil || m.nodeInsight != nil):
+		return fmt.Errorf("multiple insights in a single message")
 	}
 
 	return nil
@@ -187,8 +230,8 @@ func (c *updateStatusController) setupInsightReceiver() (factory.PostStartHook, 
 		for {
 			select {
 			case message := <-fromInformers:
-				if c.state.processInsightMsg(message) {
-					syncCtx.Queue().Add(updateStatusResource)
+				for item := range c.state.processInsightMsg(message) {
+					syncCtx.Queue().Add(item)
 				}
 			case <-ctx.Done():
 				klog.Info("USC :: Collector :: Stopping insight collector")
@@ -204,54 +247,343 @@ func (c *updateStatusController) setupInsightReceiver() (factory.PostStartHook, 
 	return startInsightReceiver, sendInsight
 }
 
-func (c *updateStatusController) commitStatusApiAsConfigMap(ctx context.Context) error {
-	// TODO: We need to change this to:
-	//   (1) On startup, load existing API and only then start receiving insights
-	//   (2) If the API does not exist on startup, create it
-	// Check whether the CM exists and do nothing if it does not exist; we never create it, only update
-	clusterUpdateStatus, err := c.updateStatuses.Get(ctx, updateStatusResource, metav1.GetOptions{})
-	if err != nil {
-		if errors.IsNotFound(err) {
-			klog.V(2).Info("USC :: Status API CM does not exist -> nothing to update")
-			return nil
-		}
-		klog.Errorf("USC :: Failed to get status API CM: %v", err)
-		return err
-	}
-
-	updateStatus := c.state.sync(clusterUpdateStatus)
-
-	_, err = c.updateStatuses.UpdateStatus(ctx, updateStatus, metav1.UpdateOptions{})
-	return err
-}
-
 func (c *updateStatusController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	queueKey := syncCtx.QueueKey()
-	if queueKey == "" {
-		klog.V(2).Info("USC :: Periodic resync")
-		queueKey = updateStatusResource
-	}
-	if queueKey != updateStatusResource {
-		// We only care about the single status API resource
-		return nil
+	key := syncCtx.QueueKey()
+	items := strings.Split(key, "/")
+	if len(items) != 3 {
+		return fmt.Errorf("unexpected queue key: %s", key)
 	}
 
-	klog.V(2).Infof("USC :: Syncing status API CM (name=%s)", queueKey)
-	return c.commitStatusApiAsConfigMap(ctx)
+	informer := items[0]
+	uid := items[2]
+
+	switch items[1] {
+	case "cv":
+		return c.syncClusterVersionProgressInsight(ctx, informer, uid)
+	case "co":
+		return c.syncClusterOperatorProgressInsight(ctx, informer, uid)
+	case "mcp":
+		return c.syncMachineConfigPoolProgressInsight(ctx, informer, uid)
+	case "node":
+		return c.syncNodeProgressInsight(ctx, informer, uid)
+	case "health":
+		return c.syncHealthInsight(ctx, informer, uid)
+	}
+
+	return nil
 }
 
-const updateStatusResource = "status-api-prototype"
+func (c *updateStatusController) syncClusterVersionProgressInsight(ctx context.Context, informer, uid string) error {
+	insightStatus := c.state.getClusterVersionProgressInsight(informer, uid)
+	name := fmt.Sprintf("%s-%s", informer, uid)
 
-func queueKey(object runtime.Object) []string {
-	if object == nil {
+	current, err := c.cvInsights.Get(ctx, name, v1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("error getting cluster version insight: %w", err)
+	}
+
+	if insightStatus == nil {
+		return c.deleteClusterVersionProgressInsight(ctx, current, err != nil && errors.IsNotFound(err))
+	}
+
+	return c.upsertClusterVersionProgressInsight(ctx, current, insightStatus, informer, uid)
+}
+
+func (c *updateStatusController) deleteClusterVersionProgressInsight(ctx context.Context, current *updatestatus.ClusterVersionProgressInsight, notFound bool) error {
+	if notFound || current == nil || current.DeletionTimestamp != nil {
 		return nil
 	}
 
-	switch o := object.(type) {
-	case *updatestatus.UpdateStatus:
-		return []string{o.Name}
+	err := c.cvInsights.Delete(ctx, current.Name, v1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("error deleting cluster version insight: %w", err)
+	}
+	return nil
+}
+
+func (c *updateStatusController) upsertClusterVersionProgressInsight(ctx context.Context, current *updatestatus.ClusterVersionProgressInsight, insightStatus *updatestatus.ClusterVersionProgressInsightStatus, informer, uid string) error {
+	if current == nil {
+		return c.createClusterVersionProgressInsight(ctx, insightStatus, informer, uid)
+	}
+	return c.updateClusterVersionProgressInsight(ctx, current, insightStatus)
+}
+
+func (c *updateStatusController) createClusterVersionProgressInsight(ctx context.Context, insightStatus *updatestatus.ClusterVersionProgressInsightStatus, informer, uid string) error {
+	insight := &updatestatus.ClusterVersionProgressInsight{
+		ObjectMeta: v1.ObjectMeta{
+			Name: fmt.Sprintf("%s-%s", informer, uid),
+		},
+		Status: *insightStatus.DeepCopy(),
 	}
 
-	klog.Fatalf("USC :: Unknown object type: %T", object)
+	_, err := c.cvInsights.Create(ctx, insight, v1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("error creating cluster version insight: %w", err)
+	}
+
+	return nil
+}
+
+func (c *updateStatusController) updateClusterVersionProgressInsight(ctx context.Context, current *updatestatus.ClusterVersionProgressInsight, insightStatus *updatestatus.ClusterVersionProgressInsightStatus) error {
+	insight := current.DeepCopy()
+	insight.Status = *insightStatus.DeepCopy()
+
+	_, err := c.cvInsights.UpdateStatus(ctx, insight, v1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("error updating cluster version insight: %w", err)
+	}
+
+	return nil
+}
+
+func (c *updateStatusController) syncClusterOperatorProgressInsight(ctx context.Context, informer, uid string) error {
+	insightStatus := c.state.getClusterOperatorProgressInsight(informer, uid)
+	name := fmt.Sprintf("%s-%s", informer, uid)
+
+	current, err := c.coInsights.Get(ctx, name, v1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("error getting cluster operator insight: %w", err)
+	}
+
+	if insightStatus == nil {
+		return c.deleteClusterOperatorProgressInsight(ctx, current, err != nil && errors.IsNotFound(err))
+	}
+
+	return c.upsertClusterOperatorProgressInsight(ctx, current, insightStatus, informer, uid)
+}
+
+func (c *updateStatusController) deleteClusterOperatorProgressInsight(ctx context.Context, current *updatestatus.ClusterOperatorProgressInsight, notFound bool) error {
+	if notFound || current == nil || current.DeletionTimestamp != nil {
+		return nil
+	}
+
+	err := c.coInsights.Delete(ctx, current.Name, v1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("error deleting cluster operator insight: %w", err)
+	}
+	return nil
+}
+
+func (c *updateStatusController) upsertClusterOperatorProgressInsight(ctx context.Context, current *updatestatus.ClusterOperatorProgressInsight, insightStatus *updatestatus.ClusterOperatorProgressInsightStatus, informer, uid string) error {
+	if current == nil {
+		return c.createClusterOperatorProgressInsight(ctx, insightStatus, informer, uid)
+	}
+	return c.updateClusterOperatorProgressInsight(ctx, current, insightStatus)
+}
+
+func (c *updateStatusController) createClusterOperatorProgressInsight(ctx context.Context, insightStatus *updatestatus.ClusterOperatorProgressInsightStatus, informer, uid string) error {
+	insight := &updatestatus.ClusterOperatorProgressInsight{
+		ObjectMeta: v1.ObjectMeta{
+			Name: fmt.Sprintf("%s-%s", informer, uid),
+		},
+		Status: *insightStatus.DeepCopy(),
+	}
+
+	_, err := c.coInsights.Create(ctx, insight, v1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("error creating cluster operator insight: %w", err)
+	}
+
+	return nil
+}
+
+func (c *updateStatusController) updateClusterOperatorProgressInsight(ctx context.Context, current *updatestatus.ClusterOperatorProgressInsight, insightStatus *updatestatus.ClusterOperatorProgressInsightStatus) error {
+	insight := current.DeepCopy()
+	insight.Status = *insightStatus.DeepCopy()
+
+	_, err := c.coInsights.UpdateStatus(ctx, insight, v1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("error updating cluster operator insight: %w", err)
+	}
+
+	return nil
+}
+
+func (c *updateStatusController) syncMachineConfigPoolProgressInsight(ctx context.Context, informer, uid string) error {
+	insightStatus := c.state.getMachineConfigPoolProgressInsight(informer, uid)
+	name := fmt.Sprintf("%s-%s", informer, uid)
+
+	current, err := c.mcpInsights.Get(ctx, name, v1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("error getting machine config pool insight: %w", err)
+	}
+
+	if insightStatus == nil {
+		return c.deleteMachineConfigPoolProgressInsight(ctx, current, err != nil && errors.IsNotFound(err))
+	}
+
+	return c.upsertMachineConfigPoolProgressInsight(ctx, current, insightStatus, informer, uid)
+}
+
+func (c *updateStatusController) deleteMachineConfigPoolProgressInsight(ctx context.Context, current *updatestatus.MachineConfigPoolProgressInsight, notFound bool) error {
+	if notFound || current == nil || current.DeletionTimestamp != nil {
+		return nil
+	}
+
+	err := c.mcpInsights.Delete(ctx, current.Name, v1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("error deleting machine config pool insight: %w", err)
+	}
+	return nil
+}
+
+func (c *updateStatusController) upsertMachineConfigPoolProgressInsight(ctx context.Context, current *updatestatus.MachineConfigPoolProgressInsight, insightStatus *updatestatus.MachineConfigPoolProgressInsightStatus, informer, uid string) error {
+	if current == nil {
+		return c.createMachineConfigPoolProgressInsight(ctx, insightStatus, informer, uid)
+	}
+	return c.updateMachineConfigPoolProgressInsight(ctx, current, insightStatus)
+}
+
+func (c *updateStatusController) createMachineConfigPoolProgressInsight(ctx context.Context, insightStatus *updatestatus.MachineConfigPoolProgressInsightStatus, informer, uid string) error {
+	insight := &updatestatus.MachineConfigPoolProgressInsight{
+		ObjectMeta: v1.ObjectMeta{
+			Name: fmt.Sprintf("%s-%s", informer, uid),
+		},
+		Status: *insightStatus.DeepCopy(),
+	}
+
+	_, err := c.mcpInsights.Create(ctx, insight, v1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("error creating machine config pool insight: %w", err)
+	}
+
+	return nil
+}
+
+func (c *updateStatusController) updateMachineConfigPoolProgressInsight(ctx context.Context, current *updatestatus.MachineConfigPoolProgressInsight, insightStatus *updatestatus.MachineConfigPoolProgressInsightStatus) error {
+	insight := current.DeepCopy()
+	insight.Status = *insightStatus.DeepCopy()
+
+	_, err := c.mcpInsights.UpdateStatus(ctx, insight, v1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("error updating machine config pool insight: %w", err)
+	}
+
+	return nil
+}
+
+func (c *updateStatusController) syncNodeProgressInsight(ctx context.Context, informer, uid string) error {
+	insightStatus := c.state.getNodeProgressInsight(informer, uid)
+	name := fmt.Sprintf("%s-%s", informer, uid)
+
+	current, err := c.nodeInsights.Get(ctx, name, v1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("error getting node insight: %w", err)
+	}
+
+	if insightStatus == nil {
+		return c.deleteNodeProgressInsight(ctx, current, err != nil && errors.IsNotFound(err))
+	}
+
+	return c.upsertNodeProgressInsight(ctx, current, insightStatus, informer, uid)
+}
+
+func (c *updateStatusController) deleteNodeProgressInsight(ctx context.Context, current *updatestatus.NodeProgressInsight, notFound bool) error {
+	if notFound || current == nil || current.DeletionTimestamp != nil {
+		return nil
+	}
+
+	err := c.nodeInsights.Delete(ctx, current.Name, v1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("error deleting node insight: %w", err)
+	}
+	return nil
+}
+
+func (c *updateStatusController) upsertNodeProgressInsight(ctx context.Context, current *updatestatus.NodeProgressInsight, insightStatus *updatestatus.NodeProgressInsightStatus, informer, uid string) error {
+	if current == nil {
+		return c.createNodeProgressInsight(ctx, insightStatus, informer, uid)
+	}
+	return c.updateNodeProgressInsight(ctx, current, insightStatus)
+}
+
+func (c *updateStatusController) createNodeProgressInsight(ctx context.Context, insightStatus *updatestatus.NodeProgressInsightStatus, informer, uid string) error {
+	insight := &updatestatus.NodeProgressInsight{
+		ObjectMeta: v1.ObjectMeta{
+			Name: fmt.Sprintf("%s-%s", informer, uid),
+		},
+		Status: *insightStatus.DeepCopy(),
+	}
+
+	_, err := c.nodeInsights.Create(ctx, insight, v1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("error creating node insight: %w", err)
+	}
+
+	return nil
+}
+
+func (c *updateStatusController) updateNodeProgressInsight(ctx context.Context, current *updatestatus.NodeProgressInsight, insightStatus *updatestatus.NodeProgressInsightStatus) error {
+	insight := current.DeepCopy()
+	insight.Status = *insightStatus.DeepCopy()
+
+	_, err := c.nodeInsights.UpdateStatus(ctx, insight, v1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("error updating node insight: %w", err)
+	}
+
+	return nil
+}
+
+func (c *updateStatusController) syncHealthInsight(ctx context.Context, informer, uid string) error {
+	insightStatus := c.state.getHealthInsight(informer, uid)
+	name := fmt.Sprintf("%s-%s", informer, uid)
+
+	current, err := c.healthInsights.Get(ctx, name, v1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("error getting health insight: %w", err)
+	}
+
+	if insightStatus == nil {
+		return c.deleteHealthInsight(ctx, current, err != nil && errors.IsNotFound(err))
+	}
+
+	return c.upsertHealthInsight(ctx, current, insightStatus, informer, uid)
+}
+
+func (c *updateStatusController) deleteHealthInsight(ctx context.Context, current *updatestatus.HealthInsight, notFound bool) error {
+	if notFound || current == nil || current.DeletionTimestamp != nil {
+		return nil
+	}
+
+	err := c.healthInsights.Delete(ctx, current.Name, v1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("error deleting health insight: %w", err)
+	}
+	return nil
+}
+
+func (c *updateStatusController) upsertHealthInsight(ctx context.Context, current *updatestatus.HealthInsight, insightStatus *updatestatus.HealthInsightStatus, informer, uid string) error {
+	if current == nil {
+		return c.createHealthInsight(ctx, insightStatus, informer, uid)
+	}
+	return c.updateHealthInsight(ctx, current, insightStatus)
+}
+
+func (c *updateStatusController) createHealthInsight(ctx context.Context, insightStatus *updatestatus.HealthInsightStatus, informer, uid string) error {
+	insight := &updatestatus.HealthInsight{
+		ObjectMeta: v1.ObjectMeta{
+			Name: fmt.Sprintf("%s-%s", informer, uid),
+		},
+		Status: *insightStatus.DeepCopy(),
+	}
+
+	_, err := c.healthInsights.Create(ctx, insight, v1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("error creating health insight: %w", err)
+	}
+
+	return nil
+}
+
+func (c *updateStatusController) updateHealthInsight(ctx context.Context, current *updatestatus.HealthInsight, insightStatus *updatestatus.HealthInsightStatus) error {
+	insight := current.DeepCopy()
+	insight.Status = *insightStatus.DeepCopy()
+
+	_, err := c.healthInsights.UpdateStatus(ctx, insight, v1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("error updating health insight: %w", err)
+	}
+
 	return nil
 }

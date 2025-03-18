@@ -2,7 +2,6 @@ package updatestatus
 
 import (
 	"fmt"
-	"slices"
 	"sync"
 	"time"
 
@@ -15,11 +14,24 @@ import (
 // insightExpirations is UID -> expiration time map
 type insightExpirations map[string]time.Time
 
+type informer struct {
+	// name is the name of the informer
+	name string
+
+	cvInsights     map[string]*updatev1alpha1.ClusterVersionProgressInsightStatus
+	coInsights     map[string]*updatev1alpha1.ClusterOperatorProgressInsightStatus
+	mcpInsights    map[string]*updatev1alpha1.MachineConfigPoolProgressInsightStatus
+	nodeInsights   map[string]*updatev1alpha1.NodeProgressInsightStatus
+	healthInsights map[string]*updatev1alpha1.HealthInsightStatus
+}
+
 // statusApi is the desired state of the status API ConfigMap. It is updated when new insights are received.
 // Any access to the struct should be done with the lock held.
 type updateStatusApi struct {
 	sync.Mutex
-	us *updatev1alpha1.UpdateStatusStatus
+
+	// informers tracks insights contributed by individual informers
+	informers map[string]*informer
 
 	// unknownInsightExpirations is a map of informer -> map of UID -> expiration time. It is used to track insights
 	// that were reported by informers but are no longer known to them. The API keeps unknown insights until they
@@ -35,61 +47,9 @@ type updateStatusApi struct {
 	now func() time.Time
 }
 
-func (c *updateStatusApi) sort() {
-	if c.us == nil || c.us.ControlPlane == nil {
-		return
-	}
-
-	slices.SortFunc(c.us.ControlPlane.Informers, func(a, b updatev1alpha1.ControlPlaneInformer) int {
-		if a.Name < b.Name {
-			return -1
-		}
-		if a.Name > b.Name {
-			return 1
-		}
-		return 0
-	})
-
-	for i := range c.us.ControlPlane.Informers {
-		slices.SortFunc(c.us.ControlPlane.Informers[i].Insights, func(a, b updatev1alpha1.ControlPlaneInsight) int {
-			if a.UID < b.UID {
-				return -1
-			}
-			if a.UID > b.UID {
-				return 1
-			}
-			return 0
-		})
-	}
-
-	for i := range c.us.WorkerPools {
-		slices.SortFunc(c.us.WorkerPools[i].Informers, func(a, b updatev1alpha1.WorkerPoolInformer) int {
-			if a.Name < b.Name {
-				return -1
-			}
-			if a.Name > b.Name {
-				return 1
-			}
-			return 0
-		})
-
-		for j := range c.us.WorkerPools[i].Informers {
-			slices.SortFunc(c.us.WorkerPools[i].Informers[j].Insights, func(a, b updatev1alpha1.WorkerPoolInsight) int {
-				if a.UID < b.UID {
-					return -1
-				}
-				if a.UID > b.UID {
-					return 1
-				}
-				return 0
-			})
-		}
-	}
-}
-
 // processInsightMsg validates the message and if valid, updates the status API with the included
-// insight. Returns true if the message was valid and processed, false otherwise.
-func (c *updateStatusApi) processInsightMsg(message informerMsg) bool {
+// insight. Returns the queue keys to sync.
+func (c *updateStatusApi) processInsightMsg(message informerMsg) []string {
 	c.Lock()
 	defer c.Unlock()
 
@@ -97,25 +57,154 @@ func (c *updateStatusApi) processInsightMsg(message informerMsg) bool {
 
 	if err := message.validate(); err != nil {
 		klog.Warningf("USC :: Collector :: Invalid message: %v", err)
-		return false
+		return nil
 	}
-	klog.Infof("USC :: Collector :: Received insight from informer %q (uid=%s)", message.informer, message.uid)
-	c.updateInsightInStatusApi(message)
+
+	klog.Infof("USC :: Collector :: Received insight from informer %q", message.informer)
+	syncs := c.updateInsightInStatusApi(message)
 	c.removeUnknownInsights(message)
 
-	return true
+	return syncs
 }
 
 // updateInsightInStatusApi updates the status API using the message.
 // Assumes the statusApi field is locked.
-func (c *updateStatusApi) updateInsightInStatusApi(msg informerMsg) {
-	c.ensureUpdateStatusExists()
-
-	if msg.cpInsight != nil {
-		c.updateControlPlaneInsight(msg.informer, msg.cpInsight)
-	} else {
-		c.updateWorkerPoolInsight(msg.informer, msg.wpInsight)
+func (c *updateStatusApi) updateInsightInStatusApi(msg informerMsg) []string {
+	if c.informers == nil {
+		c.informers = map[string]*informer{msg.informer: {name: msg.informer}}
+	} else if _, ok := c.informers[msg.informer]; !ok {
+		c.informers[msg.informer] = &informer{name: msg.informer}
 	}
+
+	switch {
+	case msg.cvInsight != nil:
+		return c.informers[msg.informer].ingestClusterVersionProgressInsight(msg.uid, msg.cvInsight)
+	case msg.coInsight != nil:
+		return c.informers[msg.informer].ingestClusterOperatorProgressInsight(msg.uid, msg.coInsight)
+	case msg.mcpInsight != nil:
+		return c.informers[msg.informer].ingestMachineConfigPoolProgressInsight(msg.uid, msg.mcpInsight)
+	case msg.nodeInsight != nil:
+		return c.informers[msg.informer].ingestNodeProgressInsight(msg.uid, msg.nodeInsight)
+	case msg.healthInsight != nil:
+		return c.informers[msg.informer].ingestHealthInsight(msg.uid, msg.healthInsight)
+	}
+
+	panic(fmt.Sprintf("unknown insight type in message: %v", msg))
+}
+
+func (c *updateStatusApi) getClusterVersionProgressInsight(informer string, uid string) *updatev1alpha1.ClusterVersionProgressInsightStatus {
+	c.Lock()
+	defer c.Unlock()
+
+	if i, ok := c.informers[informer]; ok {
+		if insight, ok := i.cvInsights[uid]; ok {
+			return insight.DeepCopy()
+		}
+	}
+
+	return nil
+}
+
+func (c *updateStatusApi) getClusterOperatorProgressInsight(informer string, uid string) *updatev1alpha1.ClusterOperatorProgressInsightStatus {
+	c.Lock()
+	defer c.Unlock()
+
+	if i, ok := c.informers[informer]; ok {
+		if insight, ok := i.coInsights[uid]; ok {
+			return insight.DeepCopy()
+		}
+	}
+
+	return nil
+}
+
+func (c *updateStatusApi) getMachineConfigPoolProgressInsight(informer string, uid string) *updatev1alpha1.MachineConfigPoolProgressInsightStatus {
+	c.Lock()
+	defer c.Unlock()
+
+	if i, ok := c.informers[informer]; ok {
+		if insight, ok := i.mcpInsights[uid]; ok {
+			return insight.DeepCopy()
+		}
+	}
+
+	return nil
+}
+
+func (c *updateStatusApi) getNodeProgressInsight(informer string, uid string) *updatev1alpha1.NodeProgressInsightStatus {
+	c.Lock()
+	defer c.Unlock()
+
+	if i, ok := c.informers[informer]; ok {
+		if insight, ok := i.nodeInsights[uid]; ok {
+			return insight.DeepCopy()
+		}
+	}
+
+	return nil
+}
+
+func (c *updateStatusApi) getHealthInsight(informer string, uid string) *updatev1alpha1.HealthInsightStatus {
+	c.Lock()
+	defer c.Unlock()
+
+	if i, ok := c.informers[informer]; ok {
+		if insight, ok := i.healthInsights[uid]; ok {
+			return insight.DeepCopy()
+		}
+	}
+
+	return nil
+}
+
+// ingestClusterVersionProgressInsight updates the status API with the ClusterVersionProgressInsight.
+// Assumes the statusApi field is locked.
+func (i *informer) ingestClusterVersionProgressInsight(uid string, insight *updatev1alpha1.ClusterVersionProgressInsightStatus) []string {
+	if i.cvInsights == nil {
+		i.cvInsights = map[string]*updatev1alpha1.ClusterVersionProgressInsightStatus{}
+	}
+	i.cvInsights[uid] = insight
+	return []string{fmt.Sprintf("%s/cv/%s", i.name, uid)}
+}
+
+// ingestClusterOperatorProgressInsight updates the status API with the ClusterOperatorProgressInsight.
+// Assumes the statusApi field is locked.
+func (i *informer) ingestClusterOperatorProgressInsight(uid string, insight *updatev1alpha1.ClusterOperatorProgressInsightStatus) []string {
+	if i.coInsights == nil {
+		i.coInsights = map[string]*updatev1alpha1.ClusterOperatorProgressInsightStatus{}
+	}
+	i.coInsights[uid] = insight
+	return []string{fmt.Sprintf("%s/co/%s", i.name, uid)}
+}
+
+// ingestMachineConfigPoolProgressInsight updates the status API with the MachineConfigPoolProgressInsight.
+// Assumes the statusApi field is locked.
+func (i *informer) ingestMachineConfigPoolProgressInsight(uid string, insight *updatev1alpha1.MachineConfigPoolProgressInsightStatus) []string {
+	if i.mcpInsights == nil {
+		i.mcpInsights = map[string]*updatev1alpha1.MachineConfigPoolProgressInsightStatus{}
+	}
+	i.mcpInsights[uid] = insight
+	return []string{fmt.Sprintf("%s/mcp/%s", i.name, uid)}
+}
+
+// ingestNodeProgressInsight updates the status API with the NodeProgressInsight.
+// Assumes the statusApi field is locked.
+func (i *informer) ingestNodeProgressInsight(uid string, insight *updatev1alpha1.NodeProgressInsightStatus) []string {
+	if i.nodeInsights == nil {
+		i.nodeInsights = map[string]*updatev1alpha1.NodeProgressInsightStatus{}
+	}
+	i.nodeInsights[uid] = insight
+	return []string{fmt.Sprintf("%s/node/%s", i.name, uid)}
+}
+
+// ingestHealthInsight updates the status API with the HealthInsight.
+// Assumes the statusApi field is locked.
+func (i *informer) ingestHealthInsight(uid string, insight *updatev1alpha1.HealthInsightStatus) []string {
+	if i.healthInsights == nil {
+		i.healthInsights = map[string]*updatev1alpha1.HealthInsightStatus{}
+	}
+	i.healthInsights[uid] = insight
+	return []string{fmt.Sprintf("%s/health/%s", i.name, uid)}
 }
 
 // removeUnknownInsights removes insights from the status API that are no longer reported as known to the informer
@@ -129,21 +218,21 @@ func (c *updateStatusApi) removeUnknownInsights(message informerMsg) {
 }
 
 func (c *updateStatusApi) handleUnknownInsightsByInformer(informer string, known sets.Set[string]) {
-	cpFilter := c.makeControlPlaneInsightFilter(informer, known)
+	cvFilter := c.makeClusterVersionInsightFilter(informer, known)
+	coFilter := c.makeClusterOperatorInsightFilter(informer, known)
+	mcpFilter := c.makeMachineConfigPoolInsightFilter(informer, known)
+	nodeFilter := c.makeNodeInsightFilter(informer, known)
+	healthFilter := c.makeHealthInsightFilter(informer, known)
 
-	for i := range c.us.ControlPlane.Informers {
-		if c.us.ControlPlane.Informers[i].Name == informer {
-			c.us.ControlPlane.Informers[i].Insights = cpFilter(c.us.ControlPlane.Informers[i].Insights)
+	for i := range c.informers {
+		if c.informers[i].name != informer {
+			continue
 		}
-	}
-
-	wpFilter := c.makeWorkerPoolInsightFilter(informer, known)
-	for pool := range c.us.WorkerPools {
-		for i := range c.us.WorkerPools[pool].Informers {
-			if c.us.WorkerPools[pool].Informers[i].Name == informer {
-				c.us.WorkerPools[pool].Informers[i].Insights = wpFilter(c.us.WorkerPools[pool].Informers[i].Insights)
-			}
-		}
+		c.informers[i].cvInsights = cvFilter(c.informers[i].cvInsights)
+		c.informers[i].coInsights = coFilter(c.informers[i].coInsights)
+		c.informers[i].mcpInsights = mcpFilter(c.informers[i].mcpInsights)
+		c.informers[i].nodeInsights = nodeFilter(c.informers[i].nodeInsights)
+		c.informers[i].healthInsights = healthFilter(c.informers[i].healthInsights)
 	}
 
 	if len(c.unknownInsightExpirations[informer]) == 0 {
@@ -154,33 +243,14 @@ func (c *updateStatusApi) handleUnknownInsightsByInformer(informer string, known
 	}
 }
 
-// // removeUnknownInsights removes insights from the status API that are no longer reported as known to the informer
-// // that originally reported them. The insights are kept for a grace period after they are no longer reported as known
-// // and eventually dropped if they are not reported as known again within that period.
-// // Assumes the statusApi field is locked.
-// func (c *updateStatusApi) removeUnknownInsights(message informerMsg) {
-// 	known := sets.New(message.knownInsights...)
-// 	known.Insert(message.uid)
-// 	informerPrefix := fmt.Sprintf("usc.%s.", message.informer)
-// 	for key := range c.cm.Data {
-// 		if strings.HasPrefix(key, informerPrefix) {
-// 			uid := strings.TrimPrefix(key, informerPrefix)
-// 			c.handleInsightExpiration(message.informer, known.Has(uid), uid)
-// 		}
-// 	}
-//
-// 	if len(c.unknownInsightExpirations) > 0 && len(c.unknownInsightExpirations[message.informer]) == 0 {
-// 		delete(c.unknownInsightExpirations, message.informer)
-// 	}
-// 	if len(c.unknownInsightExpirations) == 0 {
-// 		c.unknownInsightExpirations = nil
-// 	}
-// }
-
 type keepInsightFunc func(uid string) bool
-type cpInsightFilter func(insights []updatev1alpha1.ControlPlaneInsight) []updatev1alpha1.ControlPlaneInsight
-type wpInsightFilter func(insights []updatev1alpha1.WorkerPoolInsight) []updatev1alpha1.WorkerPoolInsight
+type cvInsightFilter func(insights map[string]*updatev1alpha1.ClusterVersionProgressInsightStatus) map[string]*updatev1alpha1.ClusterVersionProgressInsightStatus
+type coInsightFilter func(insights map[string]*updatev1alpha1.ClusterOperatorProgressInsightStatus) map[string]*updatev1alpha1.ClusterOperatorProgressInsightStatus
+type mcpInsightFilter func(insights map[string]*updatev1alpha1.MachineConfigPoolProgressInsightStatus) map[string]*updatev1alpha1.MachineConfigPoolProgressInsightStatus
+type nodeInsightFilter func(insights map[string]*updatev1alpha1.NodeProgressInsightStatus) map[string]*updatev1alpha1.NodeProgressInsightStatus
+type healthInsightFilter func(insights map[string]*updatev1alpha1.HealthInsightStatus) map[string]*updatev1alpha1.HealthInsightStatus
 
+// type wpInsightFilter func(insights []updatev1alpha1.WorkerPoolInsight) []updatev1alpha1.WorkerPoolInsight
 func (c *updateStatusApi) makeKeep(informer string, known sets.Set[string]) keepInsightFunc {
 	now := c.now()
 	return func(uid string) bool {
@@ -229,14 +299,14 @@ func (c *updateStatusApi) makeKeep(informer string, known sets.Set[string]) keep
 // If the informer knows about the insight, it is not dropped from the API and any previous expiration is cancelled.
 // If the informer does not know about the insight then it is either set to expire in the future if no expiration is
 // set yet, or the expiration is checked to see whether the insight should be dropped.
-func (c *updateStatusApi) makeControlPlaneInsightFilter(informer string, known sets.Set[string]) cpInsightFilter {
-	return func(insights []updatev1alpha1.ControlPlaneInsight) []updatev1alpha1.ControlPlaneInsight {
+func (c *updateStatusApi) makeClusterVersionInsightFilter(informer string, known sets.Set[string]) cvInsightFilter {
+	return func(insights map[string]*updatev1alpha1.ClusterVersionProgressInsightStatus) map[string]*updatev1alpha1.ClusterVersionProgressInsightStatus {
 		keep := c.makeKeep(informer, known)
-		filtered := make([]updatev1alpha1.ControlPlaneInsight, 0, len(insights))
+		filtered := make(map[string]*updatev1alpha1.ClusterVersionProgressInsightStatus, len(insights))
 
 		for i := range insights {
-			if keep(insights[i].UID) {
-				filtered = append(filtered, insights[i])
+			if keep(insights[i].Name) {
+				filtered[insights[i].Name] = insights[i]
 			}
 		}
 
@@ -247,14 +317,14 @@ func (c *updateStatusApi) makeControlPlaneInsightFilter(informer string, known s
 	}
 }
 
-func (c *updateStatusApi) makeWorkerPoolInsightFilter(informer string, known sets.Set[string]) wpInsightFilter {
-	return func(insights []updatev1alpha1.WorkerPoolInsight) []updatev1alpha1.WorkerPoolInsight {
+func (c *updateStatusApi) makeClusterOperatorInsightFilter(informer string, known sets.Set[string]) coInsightFilter {
+	return func(insights map[string]*updatev1alpha1.ClusterOperatorProgressInsightStatus) map[string]*updatev1alpha1.ClusterOperatorProgressInsightStatus {
 		keep := c.makeKeep(informer, known)
-		filtered := make([]updatev1alpha1.WorkerPoolInsight, 0, len(insights))
+		filtered := make(map[string]*updatev1alpha1.ClusterOperatorProgressInsightStatus, len(insights))
 
 		for i := range insights {
-			if keep(insights[i].UID) {
-				filtered = append(filtered, insights[i])
+			if keep(insights[i].Name) {
+				filtered[insights[i].Name] = insights[i]
 			}
 		}
 
@@ -265,154 +335,56 @@ func (c *updateStatusApi) makeWorkerPoolInsightFilter(informer string, known set
 	}
 }
 
-func (c *updateStatusApi) sync(clusterState *updatev1alpha1.UpdateStatus) *updatev1alpha1.UpdateStatus {
-	c.Lock()
-	defer c.Unlock()
+func (c *updateStatusApi) makeMachineConfigPoolInsightFilter(informer string, known sets.Set[string]) mcpInsightFilter {
+	return func(insights map[string]*updatev1alpha1.MachineConfigPoolProgressInsightStatus) map[string]*updatev1alpha1.MachineConfigPoolProgressInsightStatus {
+		keep := c.makeKeep(informer, known)
+		filtered := make(map[string]*updatev1alpha1.MachineConfigPoolProgressInsightStatus, len(insights))
 
-	if c.us == nil {
-		// This means we are running on a CM event before first insight arrived, otherwise internal state would exist
-		klog.V(2).Infof("USC :: No internal state known yet, setting internal state to cluster state")
-		// c.cm = clusterState.DeepCopy()
-		c.us = clusterState.Status.DeepCopy()
-	}
-
-	var us updatev1alpha1.UpdateStatus
-	us.TypeMeta = clusterState.TypeMeta
-	clusterState.ObjectMeta.DeepCopyInto(&us.ObjectMeta)
-	clusterState.Spec.DeepCopyInto(&us.Spec)
-	if c.us != nil {
-		c.us.DeepCopyInto(&us.Status)
-	}
-
-	return &us
-}
-
-// ensureUpdateStatusExists ensures that the internal state of the status API is initialized.
-// Assumes statusApi is locked.
-func (c *updateStatusApi) ensureUpdateStatusExists() {
-	if c.us != nil {
-		return
-	}
-
-	c.us = &updatev1alpha1.UpdateStatusStatus{}
-}
-
-func ensureControlPlaneInformer(cp *updatev1alpha1.ControlPlane, informer string) *updatev1alpha1.ControlPlaneInformer {
-	for i := range cp.Informers {
-		if cp.Informers[i].Name == informer {
-			return &cp.Informers[i]
+		for i := range insights {
+			if keep(insights[i].Name) {
+				filtered[insights[i].Name] = insights[i]
+			}
 		}
-	}
 
-	cp.Informers = append(cp.Informers, updatev1alpha1.ControlPlaneInformer{Name: informer})
-	return &cp.Informers[len(cp.Informers)-1]
-}
-
-func ensureWorkerPoolInformer(wp *updatev1alpha1.Pool, informerName string) *updatev1alpha1.WorkerPoolInformer {
-	for i := range wp.Informers {
-		if wp.Informers[i].Name == informerName {
-			return &wp.Informers[i]
+		if len(filtered) > 0 {
+			return filtered
 		}
+		return nil
 	}
-
-	wp.Informers = append(wp.Informers, updatev1alpha1.WorkerPoolInformer{Name: informerName})
-	return &wp.Informers[len(wp.Informers)-1]
 }
 
-func ensureControlPlaneInsightByInformer(informer *updatev1alpha1.ControlPlaneInformer, insight *updatev1alpha1.ControlPlaneInsight) {
-	for i := range informer.Insights {
-		if informer.Insights[i].UID == insight.UID {
-			informer.Insights[i].AcquiredAt = insight.AcquiredAt
-			insight.Insight.DeepCopyInto(&informer.Insights[i].Insight)
-			return
+func (c *updateStatusApi) makeNodeInsightFilter(informer string, known sets.Set[string]) nodeInsightFilter {
+	return func(insights map[string]*updatev1alpha1.NodeProgressInsightStatus) map[string]*updatev1alpha1.NodeProgressInsightStatus {
+		keep := c.makeKeep(informer, known)
+		filtered := make(map[string]*updatev1alpha1.NodeProgressInsightStatus, len(insights))
+
+		for i := range insights {
+			if keep(insights[i].Name) {
+				filtered[insights[i].Name] = insights[i]
+			}
 		}
-	}
 
-	informer.Insights = append(informer.Insights, *insight.DeepCopy())
-}
-
-func ensureWorkerPoolInsightByInformer(informer *updatev1alpha1.WorkerPoolInformer, insight *updatev1alpha1.WorkerPoolInsight) {
-	for i := range informer.Insights {
-		if informer.Insights[i].UID == insight.UID {
-			informer.Insights[i].AcquiredAt = insight.AcquiredAt
-			insight.Insight.DeepCopyInto(&informer.Insights[i].Insight)
-			return
+		if len(filtered) > 0 {
+			return filtered
 		}
+		return nil
 	}
-
-	informer.Insights = append(informer.Insights, *insight.DeepCopy())
 }
 
-// updateControlPlaneInsight updates the status API with the control plane insight.
-// Assumes statusApi is locked.
-func (c *updateStatusApi) updateControlPlaneInsight(informerName string, insight *updatev1alpha1.ControlPlaneInsight) {
-	// TODO: Logging - log(2) that we do something, and log(4) the diff
-	if c.us.ControlPlane == nil {
-		c.us.ControlPlane = &updatev1alpha1.ControlPlane{}
-	}
+func (c *updateStatusApi) makeHealthInsightFilter(informer string, known sets.Set[string]) healthInsightFilter {
+	return func(insights map[string]*updatev1alpha1.HealthInsightStatus) map[string]*updatev1alpha1.HealthInsightStatus {
+		keep := c.makeKeep(informer, known)
+		filtered := make(map[string]*updatev1alpha1.HealthInsightStatus, len(insights))
 
-	cp := c.us.ControlPlane
-	switch insight.Insight.Type {
-	case updatev1alpha1.ClusterVersionStatusInsightType:
-		cp.Resource = insight.Insight.ClusterVersionStatusInsight.Resource.DeepCopy()
-
-	case updatev1alpha1.MachineConfigPoolStatusInsightType:
-		cp.PoolResource = insight.Insight.MachineConfigPoolStatusInsight.Resource.DeepCopy()
-	}
-
-	informer := ensureControlPlaneInformer(cp, informerName)
-	ensureControlPlaneInsightByInformer(informer, insight)
-}
-
-func determineWorkerPool(insight *updatev1alpha1.WorkerPoolInsight) updatev1alpha1.PoolResourceRef {
-	switch insight.Insight.Type {
-	case updatev1alpha1.MachineConfigPoolStatusInsightType:
-		return insight.Insight.MachineConfigPoolStatusInsight.Resource
-	case updatev1alpha1.NodeStatusInsightType:
-		return insight.Insight.NodeStatusInsight.PoolResource
-	case updatev1alpha1.HealthInsightType:
-		// TODO: How to map a generic health insight to a worker pool?
-		panic("not implemented yet")
-	}
-
-	panic(fmt.Sprintf("unknown insight type %q", insight.Insight.Type))
-}
-
-func (c *updateStatusApi) updateWorkerPoolInsight(informerName string, insight *updatev1alpha1.WorkerPoolInsight) {
-	// TODO: Logging - log(2) that we do something, and log(4) the diff
-	poolRef := determineWorkerPool(insight)
-
-	// TODO: This should be a ControlPlaneInsight
-	if poolRef.Name == "master" {
-		c.updateControlPlaneInsight(informerName, &updatev1alpha1.ControlPlaneInsight{
-			UID:        insight.UID,
-			AcquiredAt: insight.AcquiredAt,
-			Insight: updatev1alpha1.ControlPlaneInsightUnion{
-				Type:                           insight.Insight.Type,
-				MachineConfigPoolStatusInsight: insight.Insight.MachineConfigPoolStatusInsight,
-				NodeStatusInsight:              insight.Insight.NodeStatusInsight,
-				HealthInsight:                  insight.Insight.HealthInsight,
-			},
-		})
-		return
-	}
-
-	wp := c.ensureWorkerPool(poolRef)
-	informer := ensureWorkerPoolInformer(wp, informerName)
-	ensureWorkerPoolInsightByInformer(informer, insight)
-}
-
-func (c *updateStatusApi) ensureWorkerPool(pool updatev1alpha1.PoolResourceRef) *updatev1alpha1.Pool {
-	for i := range c.us.WorkerPools {
-		if c.us.WorkerPools[i].Name == pool.Name {
-			c.us.WorkerPools[i].Resource = pool // TODO: Handle conflicts?
-			return &c.us.WorkerPools[i]
+		for i := range insights {
+			if keep(i) {
+				filtered[i] = insights[i]
+			}
 		}
-	}
-	c.us.WorkerPools = append(c.us.WorkerPools, updatev1alpha1.Pool{
-		Name:     pool.Name,
-		Resource: pool,
-	})
 
-	return &c.us.WorkerPools[len(c.us.WorkerPools)-1]
+		if len(filtered) > 0 {
+			return filtered
+		}
+		return nil
+	}
 }
