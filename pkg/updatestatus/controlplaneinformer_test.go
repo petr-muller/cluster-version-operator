@@ -39,6 +39,36 @@ func newClusterVersionStatusInsightUpdating(status metav1.ConditionStatus, reaso
 	}
 }
 
+var (
+	cvRef = updatestatus.ResourceRef{Resource: "clusterversions", Group: "config.openshift.io", Name: "version"}
+
+	progressingTrue = configv1.ClusterOperatorStatusCondition{
+		Type:    configv1.OperatorProgressing,
+		Status:  configv1.ConditionTrue,
+		Reason:  "ProgressingTrue",
+		Message: "Cluster is progressing",
+	}
+
+	progressingFalse = configv1.ClusterOperatorStatusCondition{
+		Type:    configv1.OperatorProgressing,
+		Status:  configv1.ConditionFalse,
+		Reason:  "ProgressingFalse",
+		Message: "Cluster is on version 4.X.0",
+	}
+
+	inProgress418 = configv1.UpdateHistory{
+		State:   configv1.PartialUpdate,
+		Version: "4.18.0",
+		Image:   "pullspec-4.18.0",
+	}
+
+	inProgress419 = configv1.UpdateHistory{
+		State:   configv1.PartialUpdate,
+		Version: "4.19.0",
+		Image:   "pullspec-4.19.0",
+	}
+)
+
 func Test_sync_with_cv(t *testing.T) {
 	now := metav1.Now()
 	var minutesAgo [120]metav1.Time
@@ -46,43 +76,19 @@ func Test_sync_with_cv(t *testing.T) {
 		minutesAgo[i] = metav1.NewTime(now.Time.Add(-time.Duration(i) * time.Minute))
 	}
 
-	progressingTrue := configv1.ClusterOperatorStatusCondition{
-		Type:    configv1.OperatorProgressing,
-		Status:  configv1.ConditionTrue,
-		Reason:  "ProgressingTrue",
-		Message: "Cluster is progressing",
-	}
+	inProgress418 := inProgress418.DeepCopy()
+	inProgress418.StartedTime = minutesAgo[90]
 
-	progressingFalse := configv1.ClusterOperatorStatusCondition{
-		Type:    configv1.OperatorProgressing,
-		Status:  configv1.ConditionFalse,
-		Reason:  "ProgressingFalse",
-		Message: "Cluster is on version 4.X.0",
-	}
+	inProgress419 := inProgress419.DeepCopy()
+	inProgress419.StartedTime = minutesAgo[60]
 
-	inProgress418 := configv1.UpdateHistory{
-		State:       configv1.PartialUpdate,
-		StartedTime: minutesAgo[90],
-		Version:     "4.18.0",
-		Image:       "pullspec-4.18.0",
-	}
-	var completed418 configv1.UpdateHistory
-	inProgress418.DeepCopyInto(&completed418)
+	completed418 := inProgress418.DeepCopy()
 	completed418.State = configv1.CompletedUpdate
 	completed418.CompletionTime = &minutesAgo[60]
 
-	inProgress419 := configv1.UpdateHistory{
-		State:       configv1.PartialUpdate,
-		StartedTime: minutesAgo[60],
-		Version:     "4.19.0",
-		Image:       "pullspec-4.19.0",
-	}
-	var completed419 configv1.UpdateHistory
-	inProgress419.DeepCopyInto(&completed419)
+	completed419 := inProgress419.DeepCopy()
 	completed419.State = configv1.CompletedUpdate
 	completed419.CompletionTime = &minutesAgo[30]
-
-	cvRef := updatestatus.ResourceRef{Resource: "clusterversions", Group: "config.openshift.io", Name: "version"}
 
 	testCases := []struct {
 		name          string
@@ -95,7 +101,7 @@ func Test_sync_with_cv(t *testing.T) {
 		{
 			name:          "Cluster during installation",
 			cvProgressing: &progressingTrue,
-			cvHistory:     []configv1.UpdateHistory{inProgress418},
+			cvHistory:     []configv1.UpdateHistory{*inProgress418},
 			expectedMsgs: []informerMsg{
 				{
 					informer: controlPlaneInformerName,
@@ -122,13 +128,14 @@ func Test_sync_with_cv(t *testing.T) {
 							),
 						},
 					},
+					knownInsights: []string{"version"},
 				},
 			},
 		},
 		{
 			name:          "Cluster after installation",
 			cvProgressing: &progressingFalse,
-			cvHistory:     []configv1.UpdateHistory{completed418},
+			cvHistory:     []configv1.UpdateHistory{*completed418},
 			expectedMsgs: []informerMsg{
 				{
 					informer: controlPlaneInformerName,
@@ -155,13 +162,14 @@ func Test_sync_with_cv(t *testing.T) {
 							),
 						},
 					},
+					knownInsights: []string{"version"},
 				},
 			},
 		},
 		{
 			name:          "Cluster during a standard update",
 			cvProgressing: &progressingTrue,
-			cvHistory:     []configv1.UpdateHistory{inProgress419, completed418},
+			cvHistory:     []configv1.UpdateHistory{*inProgress419, *completed418},
 			expectedMsgs: []informerMsg{
 				{
 					informer: controlPlaneInformerName,
@@ -185,13 +193,14 @@ func Test_sync_with_cv(t *testing.T) {
 							),
 						},
 					},
+					knownInsights: []string{"version"},
 				},
 			},
 		},
 		{
 			name:          "Cluster during a standard update with forced health insight",
 			cvProgressing: &progressingTrue,
-			cvHistory:     []configv1.UpdateHistory{inProgress419, completed418},
+			cvHistory:     []configv1.UpdateHistory{*inProgress419, *completed418},
 			cvAnnotations: map[string]string{
 				uscForceHealthInsightAnnotation: "value-does-not-matter",
 			},
@@ -217,6 +226,7 @@ func Test_sync_with_cv(t *testing.T) {
 							Reference: "https://issues.redhat.com/browse/OTA-1418",
 						},
 					},
+					knownInsights: []string{"0kmuaUQRUJDOAIAF1KWTmg", "version"},
 				},
 				{
 					informer: controlPlaneInformerName,
@@ -240,6 +250,7 @@ func Test_sync_with_cv(t *testing.T) {
 							),
 						},
 					},
+					knownInsights: []string{"0kmuaUQRUJDOAIAF1KWTmg", "version"},
 				},
 			},
 		},
@@ -278,6 +289,187 @@ func Test_sync_with_cv(t *testing.T) {
 			})
 			if diff := cmp.Diff(tc.expectedMsgs, actualMsgs, ignoreOrder, cmp.AllowUnexported(informerMsg{})); diff != "" {
 				t.Errorf("Sync messages differ from expected:\n%s", diff)
+			}
+			for _, msg := range actualMsgs {
+				if err := msg.validate(); err != nil {
+					t.Errorf("Received message is invalid: %v\nMessage content: %v", err, msg)
+				}
+			}
+		})
+	}
+}
+
+func Test_sync_with_cv_known_tracking(t *testing.T) {
+	now := metav1.Now()
+	var minutesAgo [120]metav1.Time
+	for i := range minutesAgo {
+		minutesAgo[i] = metav1.NewTime(now.Time.Add(-time.Duration(i) * time.Minute))
+	}
+
+	inProgress419 := inProgress419.DeepCopy()
+	inProgress419.StartedTime = minutesAgo[60]
+
+	completed418 := inProgress418.DeepCopy()
+	completed418.State = configv1.CompletedUpdate
+	completed418.CompletionTime = &minutesAgo[60]
+
+	healthInsight := updatestatus.HealthInsightStatus{
+		StartedAt: now,
+		Scope: updatestatus.InsightScope{
+			Type:      updatestatus.ControlPlaneScope,
+			Resources: []updatestatus.ResourceRef{cvRef},
+		},
+		Impact: updatestatus.InsightImpact{
+			Level:       updatestatus.InfoImpactLevel,
+			Type:        updatestatus.NoneImpactType,
+			Summary:     "Forced health insight for ClusterVersion version",
+			Description: "The resource has a \"usc.openshift.io/force-health-insight\" annotation which forces USC to generate this health insight for testing purposes.",
+		},
+		Remediation: updatestatus.InsightRemediation{
+			Reference: "https://issues.redhat.com/browse/OTA-1418",
+		},
+	}
+
+	cvProgressInsight := updatestatus.ClusterVersionProgressInsightStatus{
+		Name:       "version",
+		Assessment: updatestatus.ClusterVersionAssessmentProgressing,
+		Versions: updatestatus.ControlPlaneUpdateVersions{
+			Previous: &updatestatus.Version{Version: "4.18.0"},
+			Target:   updatestatus.Version{Version: "4.19.0"},
+		},
+		Completion:           0,
+		StartedAt:            minutesAgo[60],
+		EstimatedCompletedAt: &now,
+		Conditions: []metav1.Condition{
+			newClusterVersionStatusInsightUpdating(
+				metav1.ConditionTrue,
+				updatestatus.ClusterVersionProgressing,
+				"ClusterVersion has Progressing=True(Reason=ProgressingTrue) | Message='Cluster is progressing'",
+				now,
+			),
+		},
+	}
+
+	testCases := []struct {
+		name          string
+		beforeKnown   map[string][]string
+		expectedMsgs  []informerMsg
+		expectedKnown map[string][]string
+	}{
+		{
+			name: "CV sync with forced health insight populate known insights",
+			expectedMsgs: []informerMsg{
+				{
+					informer:      controlPlaneInformerName,
+					uid:           "0kmuaUQRUJDOAIAF1KWTmg",
+					healthInsight: &healthInsight,
+					knownInsights: []string{"0kmuaUQRUJDOAIAF1KWTmg", "version"},
+				},
+				{
+					informer:      controlPlaneInformerName,
+					uid:           "version",
+					cvInsight:     &cvProgressInsight,
+					knownInsights: []string{"0kmuaUQRUJDOAIAF1KWTmg", "version"},
+				},
+			},
+			expectedKnown: map[string][]string{"ClusterVersion/version": {"0kmuaUQRUJDOAIAF1KWTmg", "version"}},
+		},
+		{
+			name: "CV sync with forced health insight includes known insights for other queue keys",
+			beforeKnown: map[string][]string{
+				"ClusterOperator/etcd":           {"etcd-1", "etcd-2"},
+				"ClusterOperator/authentication": {"auth-1", "auth-2"},
+			},
+			expectedMsgs: []informerMsg{
+				{
+					informer:      controlPlaneInformerName,
+					uid:           "0kmuaUQRUJDOAIAF1KWTmg",
+					healthInsight: &healthInsight,
+					knownInsights: []string{"0kmuaUQRUJDOAIAF1KWTmg", "auth-1", "auth-2", "etcd-1", "etcd-2", "version"},
+				},
+				{
+					informer:      controlPlaneInformerName,
+					uid:           "version",
+					cvInsight:     &cvProgressInsight,
+					knownInsights: []string{"0kmuaUQRUJDOAIAF1KWTmg", "auth-1", "auth-2", "etcd-1", "etcd-2", "version"},
+				},
+			},
+			expectedKnown: map[string][]string{
+				"ClusterOperator/etcd":           {"etcd-1", "etcd-2"},
+				"ClusterOperator/authentication": {"auth-1", "auth-2"},
+				"ClusterVersion/version":         {"0kmuaUQRUJDOAIAF1KWTmg", "version"},
+			},
+		},
+		{
+			name: "CV sync with forced health insight drops previously known insights for queue key",
+			beforeKnown: map[string][]string{
+				"ClusterOperator/etcd":           {"etcd-1", "etcd-2"},
+				"ClusterOperator/authentication": {"auth-1", "auth-2"},
+				"ClusterVersion/version":         {"no-longer-seen", "version"},
+			},
+			expectedMsgs: []informerMsg{
+				{
+					informer:      controlPlaneInformerName,
+					uid:           "0kmuaUQRUJDOAIAF1KWTmg",
+					healthInsight: &healthInsight,
+					knownInsights: []string{"0kmuaUQRUJDOAIAF1KWTmg", "auth-1", "auth-2", "etcd-1", "etcd-2", "version"},
+				},
+				{
+					informer:      controlPlaneInformerName,
+					uid:           "version",
+					cvInsight:     &cvProgressInsight,
+					knownInsights: []string{"0kmuaUQRUJDOAIAF1KWTmg", "auth-1", "auth-2", "etcd-1", "etcd-2", "version"},
+				},
+			},
+			expectedKnown: map[string][]string{
+				"ClusterOperator/etcd":           {"etcd-1", "etcd-2"},
+				"ClusterOperator/authentication": {"auth-1", "auth-2"},
+				"ClusterVersion/version":         {"0kmuaUQRUJDOAIAF1KWTmg", "version"},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cv := makeTestClusterVersion(
+				&progressingTrue,
+				[]configv1.UpdateHistory{*inProgress419, *completed418},
+				map[string]string{uscForceHealthInsightAnnotation: "value-does-not-matter"},
+			)
+
+			cvIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+			if err := cvIndexer.Add(cv); err != nil {
+				t.Fatalf("Failed to add ClusterVersion to indexer: %v", err)
+			}
+			cvLister := configv1listers.NewClusterVersionLister(cvIndexer)
+
+			var actualMsgs []informerMsg
+			var sendInsight sendInsightFn = func(insight informerMsg) {
+				actualMsgs = append(actualMsgs, insight)
+			}
+
+			controller := controlPlaneInformerController{
+				knownInsights:   tc.beforeKnown,
+				clusterVersions: cvLister,
+				sendInsight:     sendInsight,
+				now:             func() metav1.Time { return now },
+			}
+
+			queueKey := controlPlaneInformerQueueKeys(cv)[0]
+
+			err := controller.sync(context.Background(), newTestSyncContext(queueKey))
+			if err != nil {
+				t.Fatalf("unexpected error from sync(): %v", err)
+			}
+
+			ignoreOrder := cmpopts.SortSlices(func(a, b informerMsg) bool {
+				return a.uid < b.uid
+			})
+			if diff := cmp.Diff(tc.expectedMsgs, actualMsgs, ignoreOrder, cmp.AllowUnexported(informerMsg{})); diff != "" {
+				t.Errorf("Sync messages differ from expected:\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.expectedKnown, controller.knownInsights); diff != "" {
+				t.Errorf("Known insights differ from expected:\n%s", diff)
 			}
 			for _, msg := range actualMsgs {
 				if err := msg.validate(); err != nil {
@@ -553,9 +745,10 @@ func Test_sync_with_co(t *testing.T) {
 			var expectedMsgs []informerMsg
 			for uid, insight := range tc.expectedMsgs {
 				expectedMsgs = append(expectedMsgs, informerMsg{
-					informer:  controlPlaneInformerName,
-					uid:       uid,
-					coInsight: insight.DeepCopy(),
+					informer:      controlPlaneInformerName,
+					uid:           uid,
+					coInsight:     insight.DeepCopy(),
+					knownInsights: []string{insight.Name},
 				})
 			}
 

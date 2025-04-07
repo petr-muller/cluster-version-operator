@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -32,6 +33,7 @@ type controlPlaneInformerController struct {
 	clusterOperators configv1listers.ClusterOperatorLister
 	recorder         events.Recorder
 
+	knownInsights map[string][]string
 	// sendInsight should be called to send produced insights to the update status controller
 	sendInsight sendInsightFn
 
@@ -165,12 +167,40 @@ func (c *controlPlaneInformerController) sync(ctx context.Context, syncCtx facto
 		return fmt.Errorf("invalid queue key %s with unexpected type %s", queueKey, t)
 	}
 
-	for _, msg := range msgs {
-		klog.V(2).Infof("CPI :: Syncing %s %s", t, name)
-		c.sendInsight(msg)
+	c.sendInsightsFor(queueKey, msgs)
+	return nil
+}
+
+func (c *controlPlaneInformerController) sendInsightsFor(queueKey string, insightMsgs []informerMsg) {
+	if len(insightMsgs) == 0 {
+		delete(c.knownInsights, queueKey)
+		if len(c.knownInsights) == 0 {
+			c.knownInsights = nil
+		}
+		return
 	}
 
-	return nil
+	if c.knownInsights == nil {
+		c.knownInsights = map[string][]string{}
+	}
+
+	c.knownInsights[queueKey] = nil
+	for _, msg := range insightMsgs {
+		c.knownInsights[queueKey] = append(c.knownInsights[queueKey], msg.uid)
+	}
+	slices.Sort(c.knownInsights[queueKey])
+
+	var allKnownInsights []string
+	for key := range c.knownInsights {
+		allKnownInsights = append(allKnownInsights, c.knownInsights[key]...)
+	}
+	slices.Sort(allKnownInsights)
+
+	for msg := range insightMsgs {
+		insightMsgs[msg].knownInsights = allKnownInsights
+		klog.V(2).Infof("CPI :: Syncing %s", queueKey)
+		c.sendInsight(insightMsgs[msg])
+	}
 }
 
 func makeInsightMsgForClusterOperator(coInsight *updatestatus.ClusterOperatorProgressInsightStatus) (informerMsg, error) {
