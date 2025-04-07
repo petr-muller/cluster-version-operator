@@ -953,6 +953,7 @@ func Test_sync_with_node(t *testing.T) {
 							{Type: "Degraded", Status: "False", LastTransitionTime: now, Reason: "AsExpected", Message: "The node is not degraded"},
 						},
 					},
+					knownInsights: []string{"worker-1"},
 				},
 			},
 		},
@@ -990,6 +991,7 @@ func Test_sync_with_node(t *testing.T) {
 							{Type: "Degraded", Status: "False", LastTransitionTime: now, Reason: "AsExpected", Message: "The node is not degraded"},
 						},
 					},
+					knownInsights: []string{"worker-1"},
 				},
 			},
 		},
@@ -1023,7 +1025,7 @@ func Test_sync_with_node(t *testing.T) {
 				configClient:       fakeconfigv1client.NewClientset(cv),
 				machineConfigs:     mcLister,
 				machineConfigPools: mcpLister,
-				sendInsight:        sendInsight,
+				sender:             insightMsgsSender{sendInsight: sendInsight},
 				now:                func() metav1.Time { return now },
 			}
 
@@ -1102,7 +1104,7 @@ func Test_sync_with_event(t *testing.T) {
 				nodes:              nodeLister,
 				machineConfigs:     mcLister,
 				machineConfigPools: mcpLister,
-				sendInsight:        sendInsight,
+				sender:             insightMsgsSender{sendInsight: sendInsight},
 			}
 
 			syncContext := newTestSyncContext(tc.key)
@@ -1216,7 +1218,7 @@ func Test_sync_with_mcp(t *testing.T) {
 				nodes:              nodeLister,
 				machineConfigs:     mcLister,
 				machineConfigPools: mcpLister,
-				sendInsight:        sendInsight,
+				sender:             insightMsgsSender{sendInsight: sendInsight},
 				now:                func() metav1.Time { return now },
 			}
 

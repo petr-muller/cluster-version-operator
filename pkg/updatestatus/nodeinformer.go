@@ -37,8 +37,7 @@ type nodeInformerController struct {
 	nodes              corelistersv1.NodeLister
 	recorder           events.Recorder
 
-	// sendInsight should be called to send produced insights to the update status controller
-	sendInsight sendInsightFn
+	sender insightMsgsSender
 
 	// once does the tasks that need to be executed once and only once at the beginning of its sync function
 	// for each nodeInformerController instance, e.g., initializing caches.
@@ -70,7 +69,8 @@ func newNodeInformerController(
 		machineConfigPools: machineConfigInformers.Machineconfiguration().V1().MachineConfigPools().Lister(),
 		nodes:              coreInformers.Core().V1().Nodes().Lister(),
 		recorder:           cpiRecorder,
-		sendInsight:        sendInsight,
+
+		sender: insightMsgsSender{sendInsight: sendInsight},
 
 		now: metav1.Now,
 	}
@@ -142,7 +142,8 @@ func (c *nodeInformerController) sync(ctx context.Context, syncCtx factory.SyncC
 		return fmt.Errorf("invalid queue key %s with unexpected type %s", queueKey, t)
 	}
 	klog.V(2).Infof("NI :: Syncing %s %s", t, name)
-	c.sendInsight(msg)
+
+	c.sender.sendInsightsFor(queueKey, []informerMsg{msg})
 	return nil
 }
 
