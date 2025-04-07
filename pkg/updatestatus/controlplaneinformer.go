@@ -26,6 +26,45 @@ import (
 	"github.com/openshift/cluster-version-operator/lib/resourcemerge"
 )
 
+type insightMsgsSender struct {
+	knownInsights map[string][]string
+
+	// sendInsight should be called to send produced insights to the update status controller
+	sendInsight sendInsightFn
+}
+
+func (c *insightMsgsSender) sendInsightsFor(queueKey string, insightMsgs []informerMsg) {
+	if len(insightMsgs) == 0 {
+		delete(c.knownInsights, queueKey)
+		if len(c.knownInsights) == 0 {
+			c.knownInsights = nil
+		}
+		return
+	}
+
+	if c.knownInsights == nil {
+		c.knownInsights = map[string][]string{}
+	}
+
+	c.knownInsights[queueKey] = nil
+	for _, msg := range insightMsgs {
+		c.knownInsights[queueKey] = append(c.knownInsights[queueKey], msg.uid)
+	}
+	slices.Sort(c.knownInsights[queueKey])
+
+	var allKnownInsights []string
+	for key := range c.knownInsights {
+		allKnownInsights = append(allKnownInsights, c.knownInsights[key]...)
+	}
+	slices.Sort(allKnownInsights)
+
+	for msg := range insightMsgs {
+		insightMsgs[msg].knownInsights = allKnownInsights
+		klog.V(2).Infof("CPI :: Syncing %s", queueKey)
+		c.sendInsight(insightMsgs[msg])
+	}
+}
+
 // controlPlaneInformerController is the controller that monitors health of the control plane-related resources
 // and produces insights for control plane update.
 type controlPlaneInformerController struct {
@@ -33,9 +72,7 @@ type controlPlaneInformerController struct {
 	clusterOperators configv1listers.ClusterOperatorLister
 	recorder         events.Recorder
 
-	knownInsights map[string][]string
-	// sendInsight should be called to send produced insights to the update status controller
-	sendInsight sendInsightFn
+	sender insightMsgsSender
 
 	appsClient appsv1client.AppsV1Interface
 
@@ -55,8 +92,9 @@ func newControlPlaneInformerController(
 		clusterVersions:  configInformers.Config().V1().ClusterVersions().Lister(),
 		clusterOperators: configInformers.Config().V1().ClusterOperators().Lister(),
 		recorder:         cpiRecorder,
-		sendInsight:      sendInsight,
 		appsClient:       appsClient,
+
+		sender: insightMsgsSender{sendInsight: sendInsight},
 
 		now: metav1.Now,
 	}
@@ -167,40 +205,8 @@ func (c *controlPlaneInformerController) sync(ctx context.Context, syncCtx facto
 		return fmt.Errorf("invalid queue key %s with unexpected type %s", queueKey, t)
 	}
 
-	c.sendInsightsFor(queueKey, msgs)
+	c.sender.sendInsightsFor(queueKey, msgs)
 	return nil
-}
-
-func (c *controlPlaneInformerController) sendInsightsFor(queueKey string, insightMsgs []informerMsg) {
-	if len(insightMsgs) == 0 {
-		delete(c.knownInsights, queueKey)
-		if len(c.knownInsights) == 0 {
-			c.knownInsights = nil
-		}
-		return
-	}
-
-	if c.knownInsights == nil {
-		c.knownInsights = map[string][]string{}
-	}
-
-	c.knownInsights[queueKey] = nil
-	for _, msg := range insightMsgs {
-		c.knownInsights[queueKey] = append(c.knownInsights[queueKey], msg.uid)
-	}
-	slices.Sort(c.knownInsights[queueKey])
-
-	var allKnownInsights []string
-	for key := range c.knownInsights {
-		allKnownInsights = append(allKnownInsights, c.knownInsights[key]...)
-	}
-	slices.Sort(allKnownInsights)
-
-	for msg := range insightMsgs {
-		insightMsgs[msg].knownInsights = allKnownInsights
-		klog.V(2).Infof("CPI :: Syncing %s", queueKey)
-		c.sendInsight(insightMsgs[msg])
-	}
 }
 
 func makeInsightMsgForClusterOperator(coInsight *updatestatus.ClusterOperatorProgressInsightStatus) (informerMsg, error) {

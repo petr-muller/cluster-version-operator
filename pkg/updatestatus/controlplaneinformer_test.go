@@ -273,7 +273,7 @@ func Test_sync_with_cv(t *testing.T) {
 
 			controller := controlPlaneInformerController{
 				clusterVersions: cvLister,
-				sendInsight:     sendInsight,
+				sender:          insightMsgsSender{sendInsight: sendInsight},
 				now:             func() metav1.Time { return now },
 			}
 
@@ -449,9 +449,11 @@ func Test_sync_with_cv_known_tracking(t *testing.T) {
 			}
 
 			controller := controlPlaneInformerController{
-				knownInsights:   tc.beforeKnown,
+				sender: insightMsgsSender{
+					knownInsights: tc.beforeKnown,
+					sendInsight:   sendInsight,
+				},
 				clusterVersions: cvLister,
-				sendInsight:     sendInsight,
 				now:             func() metav1.Time { return now },
 			}
 
@@ -468,7 +470,7 @@ func Test_sync_with_cv_known_tracking(t *testing.T) {
 			if diff := cmp.Diff(tc.expectedMsgs, actualMsgs, ignoreOrder, cmp.AllowUnexported(informerMsg{})); diff != "" {
 				t.Errorf("Sync messages differ from expected:\n%s", diff)
 			}
-			if diff := cmp.Diff(tc.expectedKnown, controller.knownInsights); diff != "" {
+			if diff := cmp.Diff(tc.expectedKnown, controller.sender.knownInsights); diff != "" {
 				t.Errorf("Known insights differ from expected:\n%s", diff)
 			}
 			for _, msg := range actualMsgs {
@@ -731,8 +733,9 @@ func Test_sync_with_co(t *testing.T) {
 				clusterVersions:  cvLister,
 				clusterOperators: coLister,
 				appsClient:       fakekubeclient.NewClientset(mcoDeployment.DeepCopy()).AppsV1(),
-				sendInsight:      sendInsight,
-				now:              func() metav1.Time { return now },
+				sender:           insightMsgsSender{sendInsight: sendInsight},
+
+				now: func() metav1.Time { return now },
 			}
 
 			queueKey := controlPlaneInformerQueueKeys(co)[0]
